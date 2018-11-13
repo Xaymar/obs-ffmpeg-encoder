@@ -1,0 +1,98 @@
+#pragma once
+#include <cinttypes>
+#include <string>
+
+#define MAKE_VERSION(major,minor,patch,build) ( \
+	((uint64_t(major) << 48) & 0xFFFF) \
+	((uint64_t(minor) << 32) & 0xFFFF) \
+	((uint64_t(patch) << 16) & 0xFFFF) \
+	((uint64_t(build)) & 0xFFFF))
+
+#define PROJECT_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define PROJECT_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define PROJECT_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define PROJECT_VERSION_BUILD @PROJECT_VERSION_TWEAK@
+
+#define PROJECT_NAME "@PROJECT_NAME@"
+#define PROJECT_FULL_NAME "@PROJECT_FULL_NAME@"
+#define PROJECT_DESCRIPTION "@PROJECT_DESCRIPTION@"
+
+struct version {
+	union {
+		uint64_t full;
+		struct {
+			uint16_t major;
+			uint16_t minor;
+			uint16_t patch;
+			uint16_t build;
+		};
+	};
+
+	inline bool operator==(version const& rhl)
+	{
+		return (rhl.full == this->full);
+	}
+
+	inline bool operator!=(version const& rhl)
+	{
+		return (rhl.full != this->full);
+	}
+
+	inline bool operator<(version const& rhl)
+	{
+		return (rhl.full < this->full);
+	}
+
+	inline bool operator<=(version const& rhl)
+	{
+		return (rhl.full <= this->full);
+	}
+
+	inline bool operator>(version const& rhl)
+	{
+		return (rhl.full > this->full);
+	}
+
+	inline bool operator>=(version const& rhl)
+	{
+		return (rhl.full >= this->full);
+	}
+
+	inline int32_t compare(version const& rhl, bool& major, bool& minor, bool& patch, bool& build)
+	{
+		if (major) {
+			int32_t diff = (this->major - rhl.major);
+			if (diff != 0) {
+				major = true;
+				minor = patch = build = false;
+				return diff;
+			}
+		}
+		if (minor) {
+			int32_t diff = (this->minor - rhl.minor);
+			if (diff != 0) {
+				minor = true;
+				major = patch = build = false;
+				return diff;
+			}
+		}
+		if (patch) {
+			int32_t diff = (this->patch - rhl.patch);
+			if (diff != 0) {
+				patch = true;
+				major = minor = build = false;
+				return diff;
+			}
+		}
+		if (build) {
+			int32_t diff = (this->build - rhl.build);
+			if (diff != 0) {
+				build = true;
+				major = minor = patch = false;
+				return diff;
+			}
+		}
+		major = minor = patch = build = false;
+		return 0;
+	}
+};
