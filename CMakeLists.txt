@@ -201,20 +201,22 @@ elseif(${PropertyPrefix}OBS_DOWNLOAD)
 		UPDATE_DISCONNECTED 1
 	)
 	include("${libobs_SOURCE_DIR}/cmake/LibObs/LibObsConfig.cmake")
-	if(WIN32)
-		download_project(
-			PROJ libobs-deps
-			URL "https://obsproject.com/downloads/dependencies2017.zip"
-			UPDATE_DISCONNECTED 1
-		)
-		set(FFmpegPath "${libobs-deps_SOURCE_DIR}/win${BITS}/")
-	endif()
 else()
 	message(CRITICAL "Impossible case reached, very system stability.")
 	return()
 endif()
 
 # FFmpeg
+download_project(
+	PROJ ffmpeg
+	URL "https://ffmpeg.zeranoe.com/builds/win${BITS}/dev/ffmpeg-4.1-win${BITS}-dev.zip"
+	UPDATE_DISCONNECTED 1
+)
+set(FFmpegPath "${ffmpeg_SOURCE_DIR}/ffmpeg-4.1-win${BITS}-dev/")
+if (WIN32)
+	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /SAFESEH:NO")
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /SAFESEH:NO")
+endif()
 find_package(FFmpeg REQUIRED COMPONENTS avutil avcodec swscale)
 
 ################################################################################
