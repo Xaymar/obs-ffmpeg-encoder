@@ -1,0 +1,42 @@
+version: '{build}-{branch}'
+pull_requests:
+  do_not_increment_build_number: true
+
+matrix:
+  fast_finish: true
+
+platform: x64
+image: Visual Studio 2017
+environment:
+  CMAKE_SYSTEM_VERSION: 10.0.16299.91
+  PACKAGE_PREFIX: obs-ffmpeg-encoder
+  INNOSETUP_URL: http://www.jrsoftware.org/download.php/is-unicode.exe
+
+install:
+- cmd: ci/appveyor-install.bat
+
+build_script:
+- cmd: ci/appveyor-build.bat
+
+after_build:
+- cmd: ci/appveyor-package.bat
+
+cache:
+  - inno.exe
+
+artifacts:
+  - path: build/obs-ffmpeg-encoder-*.zip
+  - path: build/obs-ffmpeg-encoder-*.7z
+  - path: build/obs-ffmpeg-encoder-*.exe
+
+deploy:
+  - provider: GitHub
+    auth_token:
+      secure: diGN1FzupARljI1iJsiAdZHut8aXODkUC6YDDi2oDRikEp5Ic8kQd8SSRDyA4pAJ
+    draft: true
+    prerelease: false
+    force_update: true
+    on:
+      appveyor_repo_tag: true
+
+test: off
