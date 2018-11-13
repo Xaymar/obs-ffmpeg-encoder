@@ -19,10 +19,41 @@
 cmake_minimum_required(VERSION 3.1.0)
 include("cmake/util.cmake")
 
+# Automatic Versioning
+set(VERSION_MAJOR 0)
+set(VERSION_MINOR 1)
+set(VERSION_PATCH 0)
+set(VERSION_TWEAK 0)
+set(PROJECT_COMMIT "N/A")
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/.git")
+	set(GIT_RESULT "")
+	set(GIT_OUTPUT "")
+	execute_process(
+		COMMAND git rev-list --count --topo-order ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}..HEAD
+		WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+		RESULT_VARIABLE GIT_RESULT
+		OUTPUT_VARIABLE GIT_OUTPUT
+		OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_STRIP_TRAILING_WHITESPACE ERROR_QUIET
+	)
+	if(GIT_RESULT EQUAL 0)
+		set(VERSION_TWEAK ${GIT_OUTPUT})
+	endif()
+	execute_process(
+		COMMAND git rev-parse HEAD
+		WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+		RESULT_VARIABLE GIT_RESULT
+		OUTPUT_VARIABLE GIT_OUTPUT
+		OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_STRIP_TRAILING_WHITESPACE ERROR_QUIET
+	)
+	if(GIT_RESULT EQUAL 0)
+		set(PROJECT_COMMIT ${GIT_OUTPUT})
+	endif()
+endif()
+
 # Define Project
 project(
 	enc-ffmpeg
-	VERSION 1.0.0.0
+	VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_TWEAK}
 )
 set(PROJECT_FULL_NAME "FFMPEG Encoder for OBS Studio")
 set(PROJECT_DESCRIPTION "Plugin for OBS Studio to add FFMPEG options for Recording and Streaming")
@@ -30,7 +61,7 @@ set(PROJECT_AUTHORS "Michael Fabian 'Xaymar' Dirks <info@xaymar.com>")
 set(PROJECT_COPYRIGHT_YEARS "2018")
 
 ################################################################################
-# CMake / Compiler
+# Setup / Bootstrap
 ################################################################################
 
 # Detect Build Type
@@ -48,6 +79,13 @@ else()
 	set(ARCH "x64")
 endif()
 
+# Search Path
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules/")
+
+################################################################################
+# CMake / Compiler
+################################################################################
+
 # Configure Version Header
 configure_file(
 	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
@@ -56,6 +94,13 @@ configure_file(
 configure_file(
 	"${PROJECT_SOURCE_DIR}/cmake/module.cpp.in"
 	"${PROJECT_BINARY_DIR}/source/module.cpp"
+)
+
+# Windows
+## Installer (InnoSetup)
+Configure_File(
+	"${PROJECT_SOURCE_DIR}/cmake/installer.iss.in"
+	"${PROJECT_BINARY_DIR}/installer.iss"
 )
 
 # Windows Specific Resource Definition
@@ -85,8 +130,6 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
 	# Update if necessary
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-long-long -pedantic")
 endif()
-
-math(EXPR BITS "8*${CMAKE_SIZEOF_VOID_P}")
 
 ################################################################################
 # Options
@@ -158,6 +201,14 @@ elseif(${PropertyPrefix}OBS_DOWNLOAD)
 		UPDATE_DISCONNECTED 1
 	)
 	include("${libobs_SOURCE_DIR}/cmake/LibObs/LibObsConfig.cmake")
+	if(WIN32)
+		download_project(
+			PROJ libobs-deps
+			URL "https://obsproject.com/downloads/dependencies2017.zip"
+			UPDATE_DISCONNECTED 1
+		)
+		set(FFmpegPath "${libobs-deps_SOURCE_DIR}/win${BITS}/")
+	endif()
 else()
 	message(CRITICAL "Impossible case reached, very system stability.")
 	return()
@@ -178,8 +229,6 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/utility.hpp"
 	"${PROJECT_SOURCE_DIR}/source/encoders/prores_aw.hpp"
 	"${PROJECT_SOURCE_DIR}/source/encoders/prores_aw.cpp"
-	"${PROJECT_SOURCE_DIR}/source/encoders/prores_ks.hpp"
-	"${PROJECT_SOURCE_DIR}/source/encoders/prores_ks.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/avframe-queue.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/avframe-queue.hpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/swscale.hpp"
