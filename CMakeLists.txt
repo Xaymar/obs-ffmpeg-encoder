@@ -184,7 +184,7 @@ endif()
 
 # Load OBS Studio
 if(${PropertyPrefix}OBS_NATIVE)
-	Option(BUILD_FFMPEG_ENCODER "Build AMD Encoder module" ON)	
+	option(BUILD_FFMPEG_ENCODER "Build AMD Encoder module" ON)	
 	if (NOT BUILD_FFMPEG_ENCODER)
 		message(STATUS "Not building AMD Encoder")
 		return()
@@ -212,7 +212,7 @@ download_project(
 	URL "https://ffmpeg.zeranoe.com/builds/win${BITS}/dev/ffmpeg-4.1-win${BITS}-dev.zip"
 	UPDATE_DISCONNECTED 1
 )
-set(FFmpegPath "${ffmpeg_SOURCE_DIR}/ffmpeg-4.1-win${BITS}-dev/")
+set(FFmpegPath "${ffmpeg_SOURCE_DIR}/")
 if (WIN32)
 	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /SAFESEH:NO")
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /SAFESEH:NO")
