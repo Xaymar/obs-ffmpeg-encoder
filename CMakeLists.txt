@@ -413,7 +413,7 @@ else()
 	endif()
 	
 	install(
-		DIRECTORY "${PROJECT_SOURCE_DIR}/resources/"
+		DIRECTORY "${PROJECT_SOURCE_DIR}/data/"
 		DESTINATION "./data/obs-plugins/${PROJECT_NAME}/"
 	)
 	
