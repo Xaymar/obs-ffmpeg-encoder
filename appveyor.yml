@@ -23,6 +23,15 @@ after_build:
 
 cache:
   - inno.exe
+  - build/32/obsdeps-build
+  - build/32/obsdeps-download
+  - build/32/obsdeps-src
+  - build/32/libobs-build
+  - build/32/libobs-download
+  - build/32/libobs-src
+  - build/64/libobs-build
+  - build/64/libobs-download
+  - build/64/libobs-src
 
 artifacts:
   - path: build/obs-ffmpeg-encoder-*.zip
