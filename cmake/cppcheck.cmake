@@ -2,6 +2,7 @@ set(CPPCHECK_PROJECTS "")
 set(CPPCHECK_ARGUMENTS "")
 set(CPPCHECK_PLATFORM "")
 set(CPPCHECK_LIBRARIES "")
+set(CPPCHECK_ENABLED FALSE)
 
 include(CMakeParseArguments)
 
@@ -46,7 +47,19 @@ function(cppcheck)
 		"${cppcheck_mulval}"
 		${ARGN}
 	)
-		
+	
+	# Do nothing if we can't find CppCheck
+	if(NOT EXISTS ${CPPCHECK_PATH})
+		return()
+	endif()
+	if(NOT IS_DIRECTORY ${CPPCHECK_PATH})
+		return()
+	endif()
+	if(NOT EXISTS ${CPPCHECK_PATH}/${CPPCHECK_BIN})
+		return()
+	endif()
+	set(CPPCHECK_ENABLED TRUE)
+	
 	# Detect Architecture (Bitness)
 	math(EXPR BITS "8*${CMAKE_SIZEOF_VOID_P}")
 	
@@ -191,6 +204,10 @@ endfunction()
 
 function(cppcheck_add_project u_project)
 	list(APPEND CPPCHECK_PROJECTS ${u_project})
+	
+	if(NOT CPPCHECK_ENABLED)
+		return()
+	endif()
 	
 	# Include Directories
 	get_target_property(_INCLUDE_DIRECTORIES ${u_project} INCLUDE_DIRECTORIES)
