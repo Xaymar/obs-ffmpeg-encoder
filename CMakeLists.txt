@@ -146,6 +146,7 @@ if(NOT TARGET libobs)
 endif()
 
 if(NOT ${PropertyPrefix}OBS_NATIVE)
+	set(${PropertyPrefix}OBS_DEPENDENCIES_DIR "" CACHE PATH "Path to OBS Dependencies")
 	set(CMAKE_PACKAGE_PREFIX "${CMAKE_BINARY_DIR}" CACHE PATH "Path for generated archives.")
 	set(CMAKE_PACKAGE_NAME "${PROJECT_NAME}" CACHE STRING "Name for the generated archives.")
 	set(CMAKE_PACKAGE_SUFFIX_OVERRIDE "" CACHE STRING "Override for the suffix.")
@@ -206,16 +207,25 @@ else()
 	return()
 endif()
 
-# FFmpeg
-download_project(
-	PROJ ffmpeg
-	URL "https://ffmpeg.zeranoe.com/builds/win${BITS}/dev/ffmpeg-4.1-win${BITS}-dev.zip"
-	UPDATE_DISCONNECTED 1
-)
-set(FFmpegPath "${ffmpeg_SOURCE_DIR}/")
-if (WIN32)
-	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /SAFESEH:NO")
-	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /SAFESEH:NO")
+# FFmpeg (compatible with OBS Studio)
+if(NOT ${PropertyPrefix}OBS_NATIVE)
+	if(WIN32)
+		if(NOT IS_DIRECTORY FFmpegPath)
+			if(IS_DIRECTORY "${${PropertyPrefix}OBS_DEPENDENCIES_DIR}")
+				set(FFmpegPath "${${PropertyPrefix}OBS_DEPENDENCIES_DIR}/win${BITS}/")
+			else()
+				download_project(
+					PROJ obsdeps
+					URL "https://obsproject.com/downloads/dependencies2017.zip"
+					UPDATE_DISCONNECTED 1
+				)
+				set(FFmpegPath "${obsdeps_SOURCE_DIR}/win${BITS}/")
+			endif()
+		endif()
+		
+		set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /SAFESEH:NO")
+		set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /SAFESEH:NO")
+	endif()
 endif()
 find_package(FFmpeg REQUIRED COMPONENTS avutil avcodec swscale)
 
@@ -377,7 +387,7 @@ endif()
 # CPPCheck
 if(NOT ${PropertyPrefix}OBS_NATIVE)
 	set(excludes )
-	list(APPEND excludes "${PROJECT_SOURCE_DIR}/AMF")
+	list(APPEND excludes "${OBS_DEPENDENCIES_DIR}")
 	if(${PropertyPrefix}OBS_REFERENCE)
 		list(APPEND excludes "${OBS_STUDIO_DIR}/libobs")
 	elseif(${PropertyPrefix}OBS_PACKAGE)
