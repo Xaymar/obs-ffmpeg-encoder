@@ -7,7 +7,7 @@ var config32 = cp.spawn(
 		'-G"Visual Studio 15 2017"',
 		'-DCMAKE_INSTALL_PREFIX="build/distrib"',
 		'-DCMAKE_PACKAGE_PREFIX="build"',
-		'-DCMAKE_PACKAGE_NAME="obs-stream-effects"'
+		'-DCMAKE_PACKAGE_NAME="xmr-ffmpeg-encoders"'
 	], {
 		windowsVerbatimArguments: true,
 		windowsHide: true
@@ -55,7 +55,7 @@ var config64 = cp.spawn(
 		'-G"Visual Studio 15 2017 Win64"',
 		'-DCMAKE_INSTALL_PREFIX="build/distrib"',
 		'-DCMAKE_PACKAGE_PREFIX="build"',
-		'-DCMAKE_PACKAGE_NAME="obs-stream-effects"'
+		'-DCMAKE_PACKAGE_NAME="xmr-ffmpeg-encoders"'
 	], {
 		windowsVerbatimArguments: true,
 		windowsHide: true
