@@ -97,11 +97,12 @@ configure_file(
 )
 
 # Windows
-## Installer (InnoSetup)
-Configure_File(
-	"${PROJECT_SOURCE_DIR}/cmake/installer.iss.in"
-	"${PROJECT_BINARY_DIR}/installer.iss"
-)
+if (WIN32)
+	## Installer (InnoSetup)
+	configure_file(
+		"${PROJECT_SOURCE_DIR}/cmake/installer.iss.in"
+		"${PROJECT_BINARY_DIR}/installer.iss"
+	)
 
 	# Windows Specific Resource Definition
 	set(PROJECT_PRODUCT_NAME "${PROJECT_FULL_NAME}")
@@ -136,8 +137,8 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 # C++ Standard and Extensions
 ## Use C++17 and no non-standard extensions.
-SET(_CXX_STANDARD 17)
-SET(_CXX_EXTENSIONS OFF)
+set(_CXX_STANDARD 17)
+set(_CXX_EXTENSIONS OFF)
 
 ################################################################################
 # Options
@@ -256,7 +257,7 @@ if(WIN32)
 	)
 endif()
 
-SET(PROJECT_GENERATED
+set(PROJECT_GENERATED
 	"${PROJECT_BINARY_DIR}/source/module.cpp"
 	"${PROJECT_BINARY_DIR}/source/version.hpp"
 )
