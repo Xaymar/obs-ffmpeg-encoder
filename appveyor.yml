@@ -1,43 +1,49 @@
+# Generic Settings
 version: '{build}-{branch}'
-pull_requests:
-  do_not_increment_build_number: true
 
 matrix:
   fast_finish: true
 
+# Build Image & Environment
 platform: x64
-image: Visual Studio 2017
-environment:
-  CMAKE_SYSTEM_VERSION: 10.0.16299.91
-  PACKAGE_PREFIX: obs-ffmpeg-encoder
-  INNOSETUP_URL: http://www.jrsoftware.org/download.php/is-unicode.exe
 
+image:
+  - Visual Studio 2017
+
+environment:
+  CMAKE_SYSTEM_VERSION: 10.0.17134.0
+  PACKAGE_PREFIX: xmr-ffmpeg-encoders
+  INNOSETUP_URL: http://www.jrsoftware.org/download.php/is.exe
+  CURL_VERSION: 7.39.0
+
+# Resource Cache
+cache:
+  - inno.exe
+  - build/32/libobs-download
+  - build/32/libobs-src
+  - build/64/libobs-download
+  - build/64/libobs-src
+
+# Building  
 install:
 - cmd: ci/appveyor-install.bat
 
 build_script:
-- cmd: ci/appveyor-build.bat
+- cmd: node ci/appveyor-build.js
 
 after_build:
 - cmd: ci/appveyor-package.bat
 
-cache:
-  - inno.exe
-  - build/32/obsdeps-build
-  - build/32/obsdeps-download
-  - build/32/obsdeps-src
-  - build/32/libobs-build
-  - build/32/libobs-download
-  - build/32/libobs-src
-  - build/64/libobs-build
-  - build/64/libobs-download
-  - build/64/libobs-src
+# Testing
+test: off
 
+# Artifacts
 artifacts:
-  - path: build/obs-ffmpeg-encoder-*.zip
-  - path: build/obs-ffmpeg-encoder-*.7z
-  - path: build/obs-ffmpeg-encoder-*.exe
+  - path: build/xmr-ffmpeg-encoders-*.zip
+  - path: build/xmr-ffmpeg-encoders-*.7z
+  - path: build/xmr-ffmpeg-encoders-*.exe
 
+# Deploying
 deploy:
   - provider: GitHub
     auth_token:
@@ -48,4 +54,15 @@ deploy:
     on:
       appveyor_repo_tag: true
 
-test: off
+# Notifications
+notifications:
+  - provider: Webhook
+    url: 
+      secure: PTtt5ALhmK0q42jYyx4/Qa1Uf18+gLMXKGdzJjDISJt8IE/K0Zyp58UYmDDbbyLp4pBRf/Ylj8rn/zYL/mqBoDVRIH5zasPqIvBD0ZhtvNjTOxQ3QoRkAmxgpWeMowm3A3I1rLizA2H4EctPpoAJGrvQ1G2HEYn9tVsGYeetFTo=
+    on_build_success: false
+    on_build_failure: false
+    on_build_status_changed: true
+    body: >-
+      {
+        "content": "**Build {{status}}**: [{{commitId}}] {{commitMessage}}\nBy {{commitAuthor}} on {{commitDate}}\n{{buildUrl}}"
+      }
