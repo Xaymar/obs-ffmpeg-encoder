@@ -1,5 +1,5 @@
-# A Plugin that integrates the AMD AMF encoder into OBS Studio
-# Copyright (C) 2016 - 2017 Michael Fabian Dirks
+# Integrates most FFmpeg supported encoders into OBS Studio
+# Copyright (C) 2018 - 2019 Michael Fabian Dirks
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
 # CMake Setup
-cmake_minimum_required(VERSION 3.1.0)
-include("cmake/util.cmake")
+CMake_Minimum_Required(VERSION 3.8.0)
+Include("cmake/util.cmake")
 
 # Automatic Versioning
 set(VERSION_MAJOR 0)
@@ -52,13 +52,13 @@ endif()
 
 # Define Project
 project(
-	enc-ffmpeg
+	xmr-ffmpeg-encoders
 	VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_TWEAK}
 )
 set(PROJECT_FULL_NAME "FFMPEG Encoder for OBS Studio")
-set(PROJECT_DESCRIPTION "Plugin for OBS Studio to add FFMPEG options for Recording and Streaming")
+set(PROJECT_DESCRIPTION "FFmpeg Encoders for OBS Studio")
 set(PROJECT_AUTHORS "Michael Fabian 'Xaymar' Dirks <info@xaymar.com>")
-set(PROJECT_COPYRIGHT_YEARS "2018")
+set(PROJECT_COPYRIGHT_YEARS "2018 - 2019")
 
 ################################################################################
 # Setup / Bootstrap
@@ -103,8 +103,7 @@ Configure_File(
 	"${PROJECT_BINARY_DIR}/installer.iss"
 )
 
-# Windows Specific Resource Definition
-if(WIN32)
+	# Windows Specific Resource Definition
 	set(PROJECT_PRODUCT_NAME "${PROJECT_FULL_NAME}")
 	set(PROJECT_COMPANY_NAME "${PROJECT_AUTHORS}")
 	set(PROJECT_COPYRIGHT "${PROJECT_AUTHORS} © ${PROJECT_COPYRIGHT_YEARS}")
@@ -119,17 +118,26 @@ if(WIN32)
 endif()
 
 # All Warnings, Extra Warnings, Pedantic
-if(MSVC)
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+	# using Clang
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-missing-braces -Wmissing-field-initializers -Wno-c++98-compat-pedantic -Wold-style-cast -Wno-documentation -Wno-documentation-unknown-command -Wno-covered-switch-default -Wno-switch-enum")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+	# GCC: -fpermissive is required as GCC does not allow the same template to be in different namespaces.
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wpedantic -fpermissive -Wno-long-long -Wno-missing-braces -Wmissing-field-initializers")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+	# using Intel C++
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 	# Force to always compile with W4
 	if(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
 		string(REGEX REPLACE "/W[0-4]" "/W4" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 	else()
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
 	endif()
-elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
-	# Update if necessary
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-long-long -pedantic")
 endif()
+# C++ Standard and Extensions
+## Use C++17 and no non-standard extensions.
+SET(_CXX_STANDARD 17)
+SET(_CXX_EXTENSIONS OFF)
 
 ################################################################################
 # Options
@@ -179,9 +187,6 @@ endif()
 if(${PropertyPrefix}OBS_DOWNLOAD)
 	include("cmake/DownloadProject.cmake")
 endif()
-if(NOT ${PropertyPrefix}OBS_NATIVE)
-	include("cmake/cppcheck.cmake")
-endif()
 
 # Load OBS Studio
 if(${PropertyPrefix}OBS_NATIVE)
@@ -203,7 +208,7 @@ elseif(${PropertyPrefix}OBS_DOWNLOAD)
 	)
 	include("${libobs_SOURCE_DIR}/cmake/LibObs/LibObsConfig.cmake")
 else()
-	message(CRITICAL "Impossible case reached, very system stability.")
+	message(CRITICAL "Impossible case reached, verify system stability.")
 	return()
 endif()
 
@@ -232,6 +237,29 @@ find_package(FFmpeg REQUIRED COMPONENTS avutil avcodec swscale)
 ################################################################################
 # Code
 ################################################################################
+set(PROJECT_DATA
+	"${PROJECT_SOURCE_DIR}/data/locale/en-US.ini"
+	"${PROJECT_SOURCE_DIR}/LICENSE"
+)
+
+set(PROJECT_LIBRARIES
+)
+
+set(PROJECT_TEMPLATES
+	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
+	"${PROJECT_SOURCE_DIR}/cmake/module.cpp.in"	
+)
+if(WIN32)
+	list(APPEND PROJECT_TEMPLATES
+		"${PROJECT_SOURCE_DIR}/cmake/installer.iss.in"
+		"${PROJECT_SOURCE_DIR}/cmake/version.rc.in"
+	)
+endif()
+
+SET(PROJECT_GENERATED
+	"${PROJECT_BINARY_DIR}/source/module.cpp"
+	"${PROJECT_BINARY_DIR}/source/version.hpp"
+)
 set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/encoder.cpp"
 	"${PROJECT_SOURCE_DIR}/source/encoder.hpp"
@@ -248,21 +276,24 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/tools.hpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/tools.cpp"
 )
-SET(PROJECT_GENERATED
-	"${PROJECT_BINARY_DIR}/source/module.cpp"
-	"${PROJECT_BINARY_DIR}/source/version.hpp"
-)
-set(PROJECT_DATA
-	"${PROJECT_SOURCE_DIR}/data/locale/en-US.ini"
-	"${PROJECT_SOURCE_DIR}/LICENSE"
-)
-set(PROJECT_LIBRARIES
-)
+
+
+
 
 # Source Grouping
 source_group(TREE "${PROJECT_SOURCE_DIR}" PREFIX "Data Files" FILES ${PROJECT_DATA})
-source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Private Files" FILES ${PROJECT_PRIVATE})
 source_group(TREE "${PROJECT_BINARY_DIR}/source" PREFIX "Generated Files" FILES ${PROJECT_GENERATED})
+source_group(TREE "${PROJECT_SOURCE_DIR}/cmake" PREFIX "Template Files" FILES ${PROJECT_TEMPLATES})
+
+# Filter Sources
+set(_TMP_SOURCE ${PROJECT_PRIVATE})
+list(FILTER _TMP_SOURCE INCLUDE REGEX "\.(c|cpp)$")
+source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Source Files" FILES ${_TMP_SOURCE})
+
+# Filter Headers
+set(_TMP_HEADER ${PROJECT_PRIVATE})
+list(FILTER _TMP_HEADER INCLUDE REGEX "\.(h|hpp)$")
+source_group(TREE "${PROJECT_SOURCE_DIR}/source" PREFIX "Header Files" FILES ${_TMP_HEADER})
 
 ################################################################################
 # Target
@@ -367,6 +398,14 @@ if (WIN32)
 	)
 endif()
 
+# C++ Standard and Extensions
+set_target_properties(
+	${PROJECT_NAME}
+	PROPERTIES
+		CXX_STANDARD ${_CXX_STANDARD}
+		CXX_EXTENSIONS ${_CXX_EXTENSIONS}
+)
+
 # File Version
 if(WIN32)
 	set_target_properties(
@@ -382,24 +421,6 @@ else()
 		VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK}
 		SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_TWEAK}
 	)
-endif()
-
-# CPPCheck
-if(NOT ${PropertyPrefix}OBS_NATIVE)
-	set(excludes )
-	list(APPEND excludes "${OBS_DEPENDENCIES_DIR}")
-	if(${PropertyPrefix}OBS_REFERENCE)
-		list(APPEND excludes "${OBS_STUDIO_DIR}/libobs")
-	elseif(${PropertyPrefix}OBS_PACKAGE)
-		list(APPEND excludes "${OBS_STUDIO_DIR}/libobs")
-	elseif(${PropertyPrefix}OBS_DOWNLOAD)
-		list(APPEND excludes "${libobs_SOURCE_DIR}")
-	endif()
-
-	cppcheck(
-		EXCLUDE ${excludes}
-	)
-	cppcheck_add_project(${PROJECT_NAME})
 endif()
 
 ################################################################################
