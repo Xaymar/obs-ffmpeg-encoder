@@ -151,7 +151,7 @@ mark_as_advanced(FORCE OBS_NATIVE OBS_PACKAGE OBS_REFERENCE OBS_DOWNLOAD)
 
 if(NOT TARGET libobs)
 	set(${PropertyPrefix}OBS_STUDIO_DIR "" CACHE PATH "OBS Studio Source/Package Directory")
-	set(${PropertyPrefix}OBS_DOWNLOAD_VERSION "22.0.2" CACHE STRING "OBS Studio Version to download")
+	set(${PropertyPrefix}OBS_DOWNLOAD_VERSION "23.2.1-ci" CACHE STRING "OBS Studio Version to download")
 endif()
 
 if(NOT ${PropertyPrefix}OBS_NATIVE)
@@ -180,7 +180,7 @@ else()
 	else()
 		message(STATUS "${PROJECT_NAME}: No OBS Studio detected, using downloadable prebuilt binaries.")
 		CacheSet(${PropertyPrefix}OBS_DOWNLOAD TRUE)
-		set(${PropertyPrefix}OBS_DOWNLOAD_URL "https://github.com/Xaymar/obs-studio/releases/download/${OBS_DOWNLOAD_VERSION}/obs-studio-${ARCH}-vs2017.7z")
+		set(${PropertyPrefix}OBS_DOWNLOAD_URL "https://github.com/Xaymar/obs-studio/releases/download/${OBS_DOWNLOAD_VERSION}/obs-studio-${ARCH}-0.0.0.0-vs2017.7z")
 	endif()
 endif()
 
