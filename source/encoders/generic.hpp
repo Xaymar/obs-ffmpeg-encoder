@@ -17,7 +17,10 @@
 
 #pragma once
 
+#include <condition_variable>
 #include <encoder.hpp>
+#include <mutex>
+#include <thread>
 #include "ffmpeg/avframe-queue.hpp"
 #include "ffmpeg/swscale.hpp"
 
@@ -48,8 +51,6 @@ namespace encoder {
 		public:
 		static bool modified_ratecontrol_properties(void* priv, obs_properties_t* props, obs_property_t* prop,
 		                                            obs_data_t* settings);
-		static bool modified_threading_properties(void* priv, obs_properties_t* props, obs_property_t* prop,
-		                                          obs_data_t* settings);
 	};
 
 	class generic {
@@ -72,7 +73,6 @@ namespace encoder {
 		virtual ~generic();
 
 		// Shared
-
 		void get_properties(obs_properties_t* props);
 
 		bool update(obs_data_t* settings);
@@ -95,5 +95,9 @@ namespace encoder {
 
 		bool video_encode_texture(uint32_t handle, int64_t pts, uint64_t lock_key, uint64_t* next_key,
 		                          struct encoder_packet* packet, bool* received_packet);
+
+		int receive_packet(bool* received_packet, struct encoder_packet* packet);
+
+		int send_frame(AVFrame* frame);
 	};
 } // namespace encoder

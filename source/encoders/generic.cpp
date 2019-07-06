@@ -19,6 +19,7 @@
 #include <iomanip>
 #include <sstream>
 #include <thread>
+#include <util/profiler.hpp>
 #include "ffmpeg/tools.hpp"
 #include "plugin.hpp"
 #include "utility.hpp"
@@ -42,11 +43,6 @@ extern "C" {
 #define P_RATECONTROL_KEYFRAME "RateControl.KeyFrame"
 #define P_RATECONTROL_KEYFRAME_TYPE "RateControl.KeyFrame.Type"
 #define P_RATECONTROL_KEYFRAME_INTERVAL "RateControl.KeyFrame.Interval"
-
-// Threading
-#define P_MULTITHREADING "MultiThreading"
-#define P_MULTITHREADING_MODEL "MultiThreading.Model"
-#define P_MULTITHREADING_THREADCOUNT "MultiThreading.ThreadCount"
 
 // FFmpeg
 #define P_FFMPEG "FFmpeg"
@@ -82,8 +78,15 @@ void encoder::generic_factory::register_encoder()
 		this->info.readable_name = sstr.str();
 	}
 
-	// Assign codec (ffmpeg name).
-	this->info.codec     = avcodec_ptr->name;
+	// Assign Ids.
+	{
+		const AVCodecDescriptor* desc = avcodec_descriptor_get(this->avcodec_ptr->id);
+		if (desc) {
+			this->info.codec = desc->name;
+		} else {
+			this->info.codec = avcodec_ptr->name;
+		}
+	}
 	this->info.oei.id    = this->info.uid.c_str();
 	this->info.oei.codec = this->info.codec.c_str();
 
@@ -320,10 +323,6 @@ void encoder::generic_factory::get_defaults(obs_data_t* settings)
 		obs_data_set_default_double(settings, P_RATECONTROL_KEYFRAME_INTERVAL ".Seconds", 2.0);
 		obs_data_set_default_int(settings, P_RATECONTROL_KEYFRAME_INTERVAL ".Frames", 300);
 
-		// Threading
-		obs_data_set_default_int(settings, P_MULTITHREADING_MODEL, -1);
-		obs_data_set_default_int(settings, P_MULTITHREADING_THREADCOUNT, 0);
-
 		// FFmpeg
 		obs_data_set_default_string(settings, P_FFMPEG_CUSTOMSETTINGS, "");
 		obs_data_set_default_int(settings, P_FFMPEG_STANDARDCOMPLIANCE, FF_COMPLIANCE_STRICT);
@@ -382,7 +381,9 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 					unit_property_map.emplace(opt->unit,
 					                          std::pair<obs_property_t*, const AVOption*>{p, opt});
 				} else {
-					p = obs_properties_add_int(props, opt->name, opt->name, opt->min, opt->max, 1);
+					p = obs_properties_add_int(props, opt->name, opt->name,
+					                           static_cast<int>(opt->min),
+					                           static_cast<int>(opt->max), 1);
 				}
 				break;
 			case AV_OPT_TYPE_FLOAT:
@@ -420,7 +421,7 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 			case AV_OPT_TYPE_COLOR:
 			case AV_OPT_TYPE_CHANNEL_LAYOUT:
 				PLOG_WARNING("Skipped option '%s' for codec '%s' as option type is not supported.",
-				             opt->name, this->info.uid);
+				             opt->name, this->info.uid.c_str());
 				break;
 			}
 
@@ -455,8 +456,10 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 			                                 TRANSLATE(P_RATECONTROL_KEYFRAME_INTERVAL), 0,
 			                                 std::numeric_limits<int32_t>::max(), 1);
 			obs_property_set_long_description(p3, TRANSLATE(DESC(P_RATECONTROL_KEYFRAME_INTERVAL)));
-			obs_properties_add_group(prs, P_RATECONTROL_KEYFRAME, TRANSLATE(P_RATECONTROL_KEYFRAME),
-			                         OBS_GROUP_NORMAL, grp);
+			auto gp = obs_properties_add_group(prs, P_RATECONTROL_KEYFRAME,
+			                                   TRANSLATE(P_RATECONTROL_KEYFRAME), OBS_GROUP_NORMAL, grp);
+
+			obs_property_set_visible(gp, !(this->avcodec_ptr->capabilities & AV_CODEC_CAP_INTRA_ONLY));
 		}
 		{
 			auto p = obs_properties_add_int(prs, P_RATECONTROL_BITRATE, TRANSLATE(P_RATECONTROL_BITRATE), 1,
@@ -477,36 +480,6 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 			}
 		}
 		obs_properties_add_group(props, P_RATECONTROL, TRANSLATE(P_RATECONTROL), OBS_GROUP_NORMAL, prs);
-	};
-	{ /// Threading
-		auto prs = obs_properties_create();
-		{
-			auto p = obs_properties_add_list(prs, P_MULTITHREADING_MODEL, TRANSLATE(P_MULTITHREADING_MODEL),
-			                                 OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-			obs_property_set_long_description(p, TRANSLATE(DESC(P_MULTITHREADING_MODEL)));
-			obs_property_set_modified_callback2(p, modified_threading_properties, this);
-			obs_property_list_add_int(p, TRANSLATE(P_MULTITHREADING_MODEL ".Automatic"), -1);
-			obs_property_list_add_int(p, TRANSLATE(P_MULTITHREADING_MODEL ".None"), 0);
-			{
-				auto idx = obs_property_list_add_int(p, TRANSLATE(P_MULTITHREADING_MODEL ".Frame"),
-				                                     FF_THREAD_FRAME);
-				obs_property_list_item_disable(
-				    p, idx, !(this->avcodec_ptr->capabilities & AV_CODEC_CAP_FRAME_THREADS));
-			}
-			{
-				auto idx = obs_property_list_add_int(p, TRANSLATE(P_MULTITHREADING_MODEL ".Slice"),
-				                                     FF_THREAD_SLICE);
-				obs_property_list_item_disable(
-				    p, idx, !(this->avcodec_ptr->capabilities & AV_CODEC_CAP_SLICE_THREADS));
-			}
-		};
-		{
-			auto p = obs_properties_add_int_slider(prs, P_MULTITHREADING_THREADCOUNT,
-			                                       TRANSLATE(P_MULTITHREADING_THREADCOUNT), 0,
-			                                       std::thread::hardware_concurrency() * 4, 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(P_MULTITHREADING_THREADCOUNT)));
-		};
-		obs_properties_add_group(props, P_MULTITHREADING, TRANSLATE(P_MULTITHREADING), OBS_GROUP_NORMAL, prs);
 	};
 	{
 		auto prs = obs_properties_create();
@@ -541,8 +514,8 @@ AVCodec* encoder::generic_factory::get_avcodec()
 	return this->avcodec_ptr;
 }
 
-bool encoder::generic_factory::modified_ratecontrol_properties(void* priv, obs_properties_t* props,
-                                                               obs_property_t* prop, obs_data_t* settings)
+bool encoder::generic_factory::modified_ratecontrol_properties(void*, obs_properties_t* props, obs_property_t*,
+                                                               obs_data_t* settings)
 {
 	keyframe_type kft = static_cast<keyframe_type>(obs_data_get_int(settings, P_RATECONTROL_KEYFRAME_TYPE));
 	obs_property_set_visible(obs_properties_get(props, P_RATECONTROL_KEYFRAME_INTERVAL ".Seconds"),
@@ -552,15 +525,8 @@ bool encoder::generic_factory::modified_ratecontrol_properties(void* priv, obs_p
 	return true;
 }
 
-bool encoder::generic_factory::modified_threading_properties(void* priv, obs_properties_t* props, obs_property_t* prop,
-                                                             obs_data_t* settings)
-{
-	int64_t tt = obs_data_get_int(settings, P_MULTITHREADING_MODEL);
-	obs_property_set_visible(obs_properties_get(props, P_MULTITHREADING_THREADCOUNT), tt != 0);
-	return true;
-}
-
-encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder) : self(encoder)
+encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
+    : self(encoder), lag_in_frames(0), frame_count(0)
 {
 	this->factory = reinterpret_cast<generic_factory*>(obs_encoder_get_type_data(self));
 
@@ -580,38 +546,25 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder) : self(e
 
 	// Settings
 	/// Rate Control
-	this->context->profile               = obs_data_get_int(settings, P_RATECONTROL_PROFILE);
-	this->context->bit_rate              = obs_data_get_int(settings, P_RATECONTROL_BITRATE);
-	this->context->strict_std_compliance = obs_data_get_int(settings, P_FFMPEG_STANDARDCOMPLIANCE);
-	this->context->debug                 = 0;
+	this->context->profile  = static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_PROFILE));
+	this->context->bit_rate = static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_BITRATE));
+	this->context->strict_std_compliance =
+	    static_cast<int>(obs_data_get_int(settings, P_FFMPEG_STANDARDCOMPLIANCE));
+	this->context->debug = 0;
 	/// Threading
-	{
-		int64_t tt = obs_data_get_int(settings, P_MULTITHREADING_MODEL);
-		if (tt == 0) {
-			this->context->thread_count = 1;
-			this->context->thread_type  = 0;
-			this->lag_in_frames         = 0;
-		} else if (tt == -1) {
-			if (this->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
-				this->context->thread_type = FF_THREAD_SLICE;
-			} else if (this->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
-				this->context->thread_type = FF_THREAD_FRAME;
-			} else {
-				this->context->thread_type = 0;
-			}
-		} else {
-			this->context->thread_type = tt;
-		}
-		if (tt != 0) {
-			this->context->thread_count = obs_data_get_int(settings, P_MULTITHREADING_THREADCOUNT);
-			this->lag_in_frames         = this->context->thread_count;
-			if (!(this->codec->capabilities & AV_CODEC_CAP_AUTO_THREADS)) {
-				if (this->context->thread_count == 0) {
-					this->context->thread_count = std::thread::hardware_concurrency();
-					this->lag_in_frames         = std::thread::hardware_concurrency();
-				}
-			}
-		}
+	if (this->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+		this->context->thread_type = FF_THREAD_SLICE;
+	} else if (this->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+		this->context->thread_type = FF_THREAD_FRAME;
+	} else {
+		this->context->thread_type = 0;
+	}
+	if (this->codec->capabilities & AV_CODEC_CAP_AUTO_THREADS) {
+		this->context->thread_count = 0;
+		this->lag_in_frames         = std::thread::hardware_concurrency();
+	} else {
+		this->context->thread_count = std::thread::hardware_concurrency();
+		this->lag_in_frames         = this->context->thread_count;
 	}
 
 	// Video and Audio exclusive setup
@@ -658,10 +611,11 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder) : self(e
 		/// Group of Pictures
 		if (static_cast<keyframe_type>(obs_data_get_int(settings, P_RATECONTROL_KEYFRAME_TYPE))
 		    == keyframe_type::Frames) {
-			this->context->gop_size = obs_data_get_int(settings, P_RATECONTROL_KEYFRAME_INTERVAL ".Frames");
+			this->context->gop_size =
+			    static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_KEYFRAME_INTERVAL ".Frames"));
 		} else {
 			double_t real_gop = obs_data_get_double(settings, P_RATECONTROL_KEYFRAME_INTERVAL ".Seconds");
-			this->context->gop_size = static_cast<int64_t>(real_gop * voi->fps_num / voi->fps_den);
+			this->context->gop_size = static_cast<int>(real_gop * voi->fps_num / voi->fps_den);
 		}
 
 	} else if (this->codec->type == AVMEDIA_TYPE_AUDIO) {
@@ -719,116 +673,125 @@ encoder::generic::~generic()
 	}
 }
 
-void encoder::generic::get_properties(obs_properties_t* props) {}
+void encoder::generic::get_properties(obs_properties_t*) {}
 
-bool encoder::generic::update(obs_data_t* settings)
+bool encoder::generic::update(obs_data_t*)
 {
 	return false;
 }
 
 bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
 {
-	int res = 0;
+	// Retrieve empty frame.
+	AVFrame* vframe = frame_queue.pop();
 
-	bool have_pushed_frame = false;
-	bool have_pulled_frame = false;
+	// Convert frame.
+	{
+		ScopeProfiler profile("convert");
 
-	auto loop_begin = std::chrono::high_resolution_clock::now();
-	auto loop_time  = std::chrono::nanoseconds(
-            static_cast<int64_t>(1000.0 * this->context->time_base.den / this->context->time_base.num) * lag_in_frames);
-	if ((lag_in_frames - frame_count) > 0) {
-		loop_time = std::chrono::nanoseconds(1);
+		vframe->color_range = this->context->color_range;
+		vframe->colorspace  = this->context->colorspace;
+
+		int res =
+		    swscale.convert(reinterpret_cast<uint8_t**>(frame->data), reinterpret_cast<int*>(frame->linesize),
+		                    0, this->context->height, vframe->data, vframe->linesize);
+		if (res <= 0) {
+			PLOG_ERROR("Failed to convert frame: %s (%ld).", ffmpeg::tools::get_error_description(res),
+			           res);
+			return false;
+		}
 	}
 
-	while (!have_pulled_frame || !have_pushed_frame) {
-		if (!have_pushed_frame) {
-			AVFrame* vframe = frame_queue.pop();
-			vframe->pts     = frame->pts;
+	// Try and receive packet early.
+	{
+		ScopeProfiler profile_inner("recieve_early");
 
-			vframe->color_range = this->context->color_range;
-			vframe->colorspace  = this->context->colorspace;
-
-			{
-				res = swscale.convert(reinterpret_cast<uint8_t**>(frame->data),
-				                      reinterpret_cast<int*>(frame->linesize), 0, this->context->height,
-				                      vframe->data, vframe->linesize);
-				if (res <= 0) {
-					PLOG_ERROR("Failed to convert frame: %s (%ld).",
-					           ffmpeg::tools::get_error_description(res), res);
-					return false;
-				}
-			}
-
-			{
-				res = avcodec_send_frame(this->context, vframe);
-				if (res < 0) {
-					PLOG_ERROR("Failed to encode frame: %s (%ld).",
-					           ffmpeg::tools::get_error_description(res), res);
-					return false;
-				}
-			}
-
-			frame_queue_used.push(vframe);
-			have_pushed_frame = true;
-			frame_count++;
-		}
-
-		if (!have_pulled_frame) {
-			res = avcodec_receive_packet(this->context, this->current_packet);
-			if (res < 0) {
-				if (res == AVERROR(EAGAIN)) {
-					*received_packet  = false;
-					have_pulled_frame = true;
-				} else if (res == AVERROR(EOF)) {
-					*received_packet  = false;
-					have_pulled_frame = true;
-				} else {
-					PLOG_ERROR("Failed to receive packet: %s (%ld).",
-					           ffmpeg::tools::get_error_description(res), res);
-					return false;
-				}
-			} else {
-				AVFrame* uframe = frame_queue_used.pop_only();
-				if (uframe) {
-					frame_queue.push(uframe);
-				}
-				packet->type          = OBS_ENCODER_VIDEO;
-				packet->pts           = this->current_packet->pts;
-				packet->dts           = this->current_packet->pts;
-				packet->data          = this->current_packet->data;
-				packet->size          = this->current_packet->size;
-				packet->keyframe      = !!(this->current_packet->flags & AV_PKT_FLAG_KEY);
-				packet->drop_priority = 0;
-				*received_packet      = true;
-				have_pulled_frame     = true;
-			}
-		}
-
-		if ((std::chrono::high_resolution_clock::now() - loop_begin) >= loop_time) {
+		int res = receive_packet(received_packet, packet);
+		switch (res) {
+		case 0:
+		case AVERROR(EAGAIN):
+		case AVERROR(EOF):
 			break;
-		} else {
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		default:
+			PLOG_ERROR("Failed to receive packet: %s (%ld).", ffmpeg::tools::get_error_description(res),
+			           res);
+			return false;
+		}
+	}
+
+	// Send a new frame.
+	{
+		ScopeProfiler profile_inner("send");
+
+		vframe->pts = frame->pts;
+
+		int res = send_frame(vframe);
+		switch (res) {
+		case 0:
+			break;
+		case AVERROR(EAGAIN):
+			// This means we should call receive_packet again, but what do we do with that data?
+			// Why can't we queue on both? Do I really have to implement threading for this stuff?
+			if (*received_packet == true) {
+				PLOG_ERROR(
+				    "Encoder wanted us to retrieve a packet before allowing us to submit more. Skipped "
+				    "frame.");
+			}
+			break;
+		case AVERROR(EOF):
+			break;
+		default:
+			PLOG_ERROR("Failed to encode frame: %s (%ld).", ffmpeg::tools::get_error_description(res), res);
+			return false;
+		}
+	}
+
+	// Try and receive packet late.
+	{
+		ScopeProfiler profile_inner("recieve_late");
+
+		bool should_lag = (lag_in_frames - frame_count) <= 0;
+		bool early_exit = false;
+
+		while ((should_lag && !*received_packet) && !early_exit) {
+			int res = receive_packet(received_packet, packet);
+			switch (res) {
+			case 0:
+				break;
+			case AVERROR(EAGAIN):
+			case AVERROR(EOF):
+				early_exit = true;
+				break;
+			default:
+				PLOG_ERROR("Failed to receive packet: %s (%ld).",
+				           ffmpeg::tools::get_error_description(res), res);
+				return false;
+			}
+
+			if (!*received_packet) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			}
 		}
 	}
 
 	return true;
 }
 
-void encoder::generic::get_audio_info(audio_convert_info* info) {}
+void encoder::generic::get_audio_info(audio_convert_info*) {}
 
 size_t encoder::generic::get_frame_size()
 {
 	return size_t();
 }
 
-bool encoder::generic::audio_encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
+bool encoder::generic::audio_encode(encoder_frame*, encoder_packet*, bool*)
 {
 	return false;
 }
 
-void encoder::generic::get_video_info(video_scale_info* info) {}
+void encoder::generic::get_video_info(video_scale_info*) {}
 
-bool encoder::generic::get_sei_data(uint8_t** sei_data, size_t* size)
+bool encoder::generic::get_sei_data(uint8_t**, size_t*)
 {
 	return false;
 }
@@ -843,8 +806,46 @@ bool encoder::generic::get_extra_data(uint8_t** extra_data, size_t* size)
 	return true;
 }
 
-bool encoder::generic::video_encode_texture(uint32_t handle, int64_t pts, uint64_t lock_key, uint64_t* next_key,
-                                            encoder_packet* packet, bool* received_packet)
+bool encoder::generic::video_encode_texture(uint32_t, int64_t, uint64_t, uint64_t*, encoder_packet*, bool*)
 {
 	return false;
+}
+
+int encoder::generic::receive_packet(bool* received_packet, struct encoder_packet* packet)
+{
+	int res = avcodec_receive_packet(this->context, this->current_packet);
+	if (res == 0) {
+		packet->type          = OBS_ENCODER_VIDEO;
+		packet->pts           = this->current_packet->pts;
+		packet->dts           = this->current_packet->pts;
+		packet->data          = this->current_packet->data;
+		packet->size          = this->current_packet->size;
+		packet->keyframe      = !!(this->current_packet->flags & AV_PKT_FLAG_KEY);
+		packet->drop_priority = 0;
+		*received_packet      = true;
+
+		{
+			AVFrame* uframe = frame_queue_used.pop_only();
+			if (frame_queue.empty()) {
+				frame_queue.push(uframe);
+			} else {
+				av_frame_free(&uframe);
+			}
+		}
+	}
+	return res;
+}
+
+int encoder::generic::send_frame(AVFrame* frame)
+{
+	int res = avcodec_send_frame(this->context, frame);
+	switch (res) {
+	case 0:
+		frame_queue_used.push(frame);
+		frame_count++;
+	case AVERROR(EAGAIN):
+	case AVERROR(EOF):
+		break;
+	}
+	return res;
 }
