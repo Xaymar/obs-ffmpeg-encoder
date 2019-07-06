@@ -41,7 +41,7 @@ MODULE_EXPORT bool obs_module_load(void)
 		// Register all codecs.
 		AVCodec* cdc = nullptr;
 		while ((cdc = av_codec_next(cdc)) != nullptr) {
-			if ((!cdc->encode2) && (!cdc->send_frame))
+			if (!av_codec_is_encoder(cdc))
 				continue;
 
 			if ((cdc->type == AVMediaType::AVMEDIA_TYPE_AUDIO)
