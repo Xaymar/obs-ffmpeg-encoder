@@ -105,10 +105,10 @@ void encoder::generic_factory::register_encoder()
 			return reinterpret_cast<void*>(new generic(settings, encoder));
 		} catch (std::exception const& e) {
 			PLOG_ERROR("exception: %s", e.what());
-			throw e;
+			return reinterpret_cast<void*>(0);
 		} catch (...) {
 			PLOG_ERROR("unknown exception");
-			throw;
+			return reinterpret_cast<void*>(0);
 		}
 	};
 	this->info.oei.destroy = [](void* ptr) {
@@ -287,6 +287,7 @@ const char* encoder::generic_factory::get_name()
 
 void encoder::generic_factory::get_defaults(obs_data_t* settings)
 {
+#ifdef GENERATE_OPTIONS
 	AVCodecContext* ctx = avcodec_alloc_context3(this->avcodec_ptr);
 	if (ctx->priv_data) {
 		const AVOption* opt = nullptr;
@@ -314,6 +315,7 @@ void encoder::generic_factory::get_defaults(obs_data_t* settings)
 			}
 		}
 	}
+#endif
 
 	{ // Integrated Options
 		// Rate Control
@@ -331,6 +333,7 @@ void encoder::generic_factory::get_defaults(obs_data_t* settings)
 
 void encoder::generic_factory::get_properties(obs_properties_t* props)
 {
+#ifdef GENERATE_OPTIONS
 	// Encoder Options
 	AVCodecContext* ctx = avcodec_alloc_context3(this->avcodec_ptr);
 	if (ctx->priv_data) {
@@ -431,6 +434,7 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 		}
 	}
 	avcodec_free_context(&ctx);
+#endif
 
 	// FFmpeg Options
 	{ /// Rate Control
@@ -546,8 +550,6 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 
 	// Settings
 	/// Rate Control
-	this->context->profile  = static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_PROFILE));
-	this->context->bit_rate = static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_BITRATE));
 	this->context->strict_std_compliance =
 	    static_cast<int>(obs_data_get_int(settings, P_FFMPEG_STANDARDCOMPLIANCE));
 	this->context->debug = 0;
@@ -635,7 +637,6 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 	// Video/Audio exclusive setup part 2.
 	if (this->codec->type == AVMEDIA_TYPE_VIDEO) {
 		// Create Scaler
-
 		if (!swscale.initialize(SWS_FAST_BILINEAR)) {
 			PLOG_ERROR(
 			    " Failed to initialize Software Scaler for pixel format '%s' with color space '%s' and "
@@ -675,8 +676,49 @@ encoder::generic::~generic()
 
 void encoder::generic::get_properties(obs_properties_t*) {}
 
-bool encoder::generic::update(obs_data_t*)
+bool encoder::generic::update(obs_data_t* settings)
 {
+#ifdef GENERATE_OPTIONS
+	// Apply UI options.
+	if (this->context->priv_data) {
+		const AVOption* opt = nullptr;
+		while ((opt = av_opt_next(this->context->priv_data, opt)) != nullptr) {
+			if (opt->type == AV_OPT_TYPE_CONST && opt->unit != nullptr) {
+				continue;
+			}
+
+			switch (opt->type) {
+			case AV_OPT_TYPE_BOOL:
+				av_opt_set_int(this->context->priv_data, opt->name,
+				               obs_data_get_bool(settings, opt->name) ? 1 : 0, 0);
+				break;
+			case AV_OPT_TYPE_INT:
+			case AV_OPT_TYPE_INT64:
+			case AV_OPT_TYPE_UINT64:
+				av_opt_set_int(this->context->priv_data, opt->name,
+				               obs_data_get_int(settings, opt->name), 0);
+				break;
+			case AV_OPT_TYPE_FLOAT:
+			case AV_OPT_TYPE_DOUBLE:
+				av_opt_set_double(this->context->priv_data, opt->name,
+				                  obs_data_get_double(settings, opt->name), 0);
+				break;
+			case AV_OPT_TYPE_STRING:
+				av_opt_set(this->context->priv_data, opt->name,
+				           obs_data_get_string(settings, opt->name), 0);
+				break;
+			}
+		}
+	}
+#endif
+
+	// Apply default options
+	this->context->profile  = static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_PROFILE));
+	this->context->bit_rate = static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_BITRATE));
+
+	// Apply custom options.
+	av_opt_set_from_string(this->context, obs_data_get_string(settings, P_FFMPEG_CUSTOMSETTINGS), nullptr, ";",
+	                       "=");
 	return false;
 }
 
