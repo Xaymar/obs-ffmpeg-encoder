@@ -20,9 +20,12 @@
 #include <stdexcept>
 
 extern "C" {
+#pragma warning(push)
+#pragma warning(disable : 4244)
 #include <libavcodec/avcodec.h>
 #include <libavutil/error.h>
 #include <libavutil/pixdesc.h>
+#pragma warning(pop)
 }
 
 std::string ffmpeg::tools::translate_encoder_capabilities(int capabilities)
@@ -116,10 +119,47 @@ const char* ffmpeg::tools::get_error_description(int error)
 	switch (error) {
 	case AVERROR(EPERM):
 		return "Permission Denied";
+		//	case AVERROR(ENOENT):
+		//	case AVERROR(ESRCH):
+		//	case AVERROR(EINTR):
+		//	case AVERROR(EIO):
+		//	case AVERROR(ENXIO):
+		//	case AVERROR(E2BIG):
+		//	case AVERROR(ENOEXEC):
+		//	case AVERROR(EBADF):
+		//	case AVERROR(ECHILD):
+		//	case AVERROR(EAGAIN):
 	case AVERROR(ENOMEM):
 		return "Out Of Memory";
+		//	case AVERROR(EACCES):
+		//	case AVERROR(EFAULT):
+		//	case AVERROR(EBUSY):
+		//	case AVERROR(EEXIST):
+		//	case AVERROR(EXDEV):
+		//	case AVERROR(ENODEV):
+		//	case AVERROR(ENOTDIR):
+		//	case AVERROR(EISDIR):
+		//	case AVERROR(ENFILE):
+		//	case AVERROR(EMFILE):
+		//	case AVERROR(ENOTTY):
+		//	case AVERROR(EFBIG):
+		//	case AVERROR(ENOSPC):
+		//	case AVERROR(ESPIPE):
+		//	case AVERROR(EROFS):
+		//	case AVERROR(EMLINK):
+		//	case AVERROR(EPIPE):
+		//	case AVERROR(EDOM):
+		//	case AVERROR(EDEADLK):
+		//	case AVERROR(ENAMETOOLONG):
+		//	case AVERROR(ENOLCK):
+		//	case AVERROR(ENOSYS):
+		//	case AVERROR(ENOTEMPTY):
 	case AVERROR(EINVAL):
-		return "Invalid Value for Parameter";
+		return "Invalid Value(s)";
+	case AVERROR(ERANGE):
+		return "Out of Range";
+		//	case AVERROR(EILSEQ):
+		//	case AVERROR(STRUNCATE):
 	}
 	return "Not Translated Yet";
 }
