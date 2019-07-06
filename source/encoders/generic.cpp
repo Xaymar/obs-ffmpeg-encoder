@@ -47,7 +47,6 @@ extern "C" {
 #define P_MULTITHREADING "MultiThreading"
 #define P_MULTITHREADING_MODEL "MultiThreading.Model"
 #define P_MULTITHREADING_THREADCOUNT "MultiThreading.ThreadCount"
-#define P_MULTITHREADING_FRAMEQUEUE "MultiThreading.FrameQueue"
 
 // FFmpeg
 #define P_FFMPEG "FFmpeg"
@@ -171,51 +170,6 @@ void encoder::generic_factory::register_encoder()
 			throw;
 		}
 	};
-	this->info.oei.encode = [](void* ptr, struct encoder_frame* frame, struct encoder_packet* packet,
-	                           bool* received_packet) {
-		try {
-			return reinterpret_cast<generic*>(ptr)->encode(frame, packet, received_packet);
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
-	this->info.oei.get_audio_info = [](void* ptr, struct audio_convert_info* info) {
-		try {
-			reinterpret_cast<generic*>(ptr)->get_audio_info(info);
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
-	this->info.oei.get_frame_size = [](void* ptr) {
-		try {
-			return reinterpret_cast<generic*>(ptr)->get_frame_size();
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
-	this->info.oei.get_video_info = [](void* ptr, struct video_scale_info* info) {
-		try {
-			reinterpret_cast<generic*>(ptr)->get_video_info(info);
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
 	this->info.oei.get_sei_data = [](void* ptr, uint8_t** sei_data, size_t* size) {
 		try {
 			return reinterpret_cast<generic*>(ptr)->get_sei_data(sei_data, size);
@@ -238,19 +192,82 @@ void encoder::generic_factory::register_encoder()
 			throw;
 		}
 	};
-	this->info.oei.encode_texture = [](void* ptr, uint32_t handle, int64_t pts, uint64_t lock_key,
-	                                   uint64_t* next_key, struct encoder_packet* packet, bool* received_packet) {
-		try {
-			return reinterpret_cast<generic*>(ptr)->encode_texture(handle, pts, lock_key, next_key, packet,
-			                                                       received_packet);
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
+
+	if (this->avcodec_ptr->type == AVMediaType::AVMEDIA_TYPE_VIDEO) {
+		this->info.oei.get_video_info = [](void* ptr, struct video_scale_info* info) {
+			try {
+				reinterpret_cast<generic*>(ptr)->get_video_info(info);
+			} catch (std::exception const& e) {
+				PLOG_ERROR("exception: %s", e.what());
+				throw e;
+			} catch (...) {
+				PLOG_ERROR("unknown exception");
+				throw;
+			}
+		};
+		this->info.oei.encode = [](void* ptr, struct encoder_frame* frame, struct encoder_packet* packet,
+		                           bool* received_packet) {
+			try {
+				return reinterpret_cast<generic*>(ptr)->video_encode(frame, packet, received_packet);
+			} catch (std::exception const& e) {
+				PLOG_ERROR("exception: %s", e.what());
+				throw e;
+			} catch (...) {
+				PLOG_ERROR("unknown exception");
+				throw;
+			}
+		};
+		this->info.oei.encode_texture = [](void* ptr, uint32_t handle, int64_t pts, uint64_t lock_key,
+		                                   uint64_t* next_key, struct encoder_packet* packet,
+		                                   bool* received_packet) {
+			try {
+				return reinterpret_cast<generic*>(ptr)->video_encode_texture(
+				    handle, pts, lock_key, next_key, packet, received_packet);
+			} catch (std::exception const& e) {
+				PLOG_ERROR("exception: %s", e.what());
+				throw e;
+			} catch (...) {
+				PLOG_ERROR("unknown exception");
+				throw;
+			}
+		};
+
+	} else if (this->avcodec_ptr->type == AVMediaType::AVMEDIA_TYPE_AUDIO) {
+		this->info.oei.get_audio_info = [](void* ptr, struct audio_convert_info* info) {
+			try {
+				reinterpret_cast<generic*>(ptr)->get_audio_info(info);
+			} catch (std::exception const& e) {
+				PLOG_ERROR("exception: %s", e.what());
+				throw e;
+			} catch (...) {
+				PLOG_ERROR("unknown exception");
+				throw;
+			}
+		};
+		this->info.oei.get_frame_size = [](void* ptr) {
+			try {
+				return reinterpret_cast<generic*>(ptr)->get_frame_size();
+			} catch (std::exception const& e) {
+				PLOG_ERROR("exception: %s", e.what());
+				throw e;
+			} catch (...) {
+				PLOG_ERROR("unknown exception");
+				throw;
+			}
+		};
+		this->info.oei.encode = [](void* ptr, struct encoder_frame* frame, struct encoder_packet* packet,
+		                           bool* received_packet) {
+			try {
+				return reinterpret_cast<generic*>(ptr)->audio_encode(frame, packet, received_packet);
+			} catch (std::exception const& e) {
+				PLOG_ERROR("exception: %s", e.what());
+				throw e;
+			} catch (...) {
+				PLOG_ERROR("unknown exception");
+				throw;
+			}
+		};
+	}
 
 	// Finally store ourself as type data.
 	this->info.oei.type_data = this;
@@ -305,7 +322,6 @@ void encoder::generic_factory::get_defaults(obs_data_t* settings)
 
 		// Threading
 		obs_data_set_default_int(settings, P_MULTITHREADING_MODEL, -1);
-		obs_data_set_default_bool(settings, P_MULTITHREADING_FRAMEQUEUE, true);
 		obs_data_set_default_int(settings, P_MULTITHREADING_THREADCOUNT, 0);
 
 		// FFmpeg
@@ -490,12 +506,6 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 			                                       std::thread::hardware_concurrency() * 4, 1);
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_MULTITHREADING_THREADCOUNT)));
 		};
-		{
-			auto p = obs_properties_add_bool(prs, P_MULTITHREADING_FRAMEQUEUE,
-			                                 TRANSLATE(P_MULTITHREADING_FRAMEQUEUE));
-			obs_property_set_long_description(p, TRANSLATE(DESC(P_MULTITHREADING_FRAMEQUEUE)));
-		};
-
 		obs_properties_add_group(props, P_MULTITHREADING, TRANSLATE(P_MULTITHREADING), OBS_GROUP_NORMAL, prs);
 	};
 	{
@@ -574,13 +584,13 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder) : self(e
 	this->context->bit_rate              = obs_data_get_int(settings, P_RATECONTROL_BITRATE);
 	this->context->strict_std_compliance = obs_data_get_int(settings, P_FFMPEG_STANDARDCOMPLIANCE);
 	this->context->debug                 = 0;
-
 	/// Threading
 	{
 		int64_t tt = obs_data_get_int(settings, P_MULTITHREADING_MODEL);
 		if (tt == 0) {
 			this->context->thread_count = 1;
 			this->context->thread_type  = 0;
+			this->lag_in_frames         = 0;
 		} else if (tt == -1) {
 			if (this->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
 				this->context->thread_type = FF_THREAD_SLICE;
@@ -594,9 +604,11 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder) : self(e
 		}
 		if (tt != 0) {
 			this->context->thread_count = obs_data_get_int(settings, P_MULTITHREADING_THREADCOUNT);
+			this->lag_in_frames         = this->context->thread_count;
 			if (!(this->codec->capabilities & AV_CODEC_CAP_AUTO_THREADS)) {
 				if (this->context->thread_count == 0) {
 					this->context->thread_count = std::thread::hardware_concurrency();
+					this->lag_in_frames         = std::thread::hardware_concurrency();
 				}
 			}
 		}
@@ -607,12 +619,42 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder) : self(e
 		// FFmpeg Video Settings
 		auto encvideo = obs_encoder_video(this->self);
 		auto voi      = video_output_get_info(encvideo);
-		/// Resolution and framerate.
-		this->context->width           = voi->width;
-		this->context->height          = voi->height;
+
+		// Resolution
+		this->context->width  = voi->width;
+		this->context->height = voi->height;
+		this->swscale.set_source_size(this->context->width, this->context->height);
+		this->swscale.set_target_size(this->context->width, this->context->height);
+
+		// Color
+		this->context->colorspace  = ffmpeg::tools::obs_videocolorspace_to_avcolorspace(voi->colorspace);
+		this->context->color_range = ffmpeg::tools::obs_videorangetype_to_avcolorrange(voi->range);
+		this->context->field_order = AV_FIELD_PROGRESSIVE;
+		this->swscale.set_source_color(this->context->color_range, this->context->colorspace);
+		this->swscale.set_target_color(this->context->color_range, this->context->colorspace);
+
+		// Pixel Format
+		{
+			// Due to unsupported color formats and ffmpeg not automatically converting formats from A to B,
+			// we have to detect the closest format that we can still use and initialize our swscale instance
+			// these formats. This has a massive cost attached unfortunately.
+
+			AVPixelFormat source = ffmpeg::tools::obs_videoformat_to_avpixelformat(voi->format);
+			AVPixelFormat target = AV_PIX_FMT_NONE;
+
+			int loss = 0;
+			target   = avcodec_find_best_pix_fmt_of_list(this->codec->pix_fmts, source, false, &loss);
+
+			this->context->pix_fmt = target;
+			this->swscale.set_source_format(source);
+			this->swscale.set_target_format(this->context->pix_fmt);
+		}
+
+		// Framerate
 		this->context->time_base.num   = voi->fps_num;
 		this->context->time_base.den   = voi->fps_den;
 		this->context->ticks_per_frame = 1;
+
 		/// Group of Pictures
 		if (static_cast<keyframe_type>(obs_data_get_int(settings, P_RATECONTROL_KEYFRAME_TYPE))
 		    == keyframe_type::Frames) {
@@ -621,11 +663,7 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder) : self(e
 			double_t real_gop = obs_data_get_double(settings, P_RATECONTROL_KEYFRAME_INTERVAL ".Seconds");
 			this->context->gop_size = static_cast<int64_t>(real_gop * voi->fps_num / voi->fps_den);
 		}
-		/// Color, Profile
-		this->context->colorspace  = ffmpeg::tools::obs_videocolorspace_to_avcolorspace(voi->colorspace);
-		this->context->color_range = ffmpeg::tools::obs_videorangetype_to_avcolorrange(voi->range);
-		this->context->pix_fmt     = ffmpeg::tools::obs_videoformat_to_avpixelformat(voi->format);
-		this->context->field_order = AV_FIELD_PROGRESSIVE;
+
 	} else if (this->codec->type == AVMEDIA_TYPE_AUDIO) {
 	}
 
@@ -643,12 +681,6 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder) : self(e
 	// Video/Audio exclusive setup part 2.
 	if (this->codec->type == AVMEDIA_TYPE_VIDEO) {
 		// Create Scaler
-		swscale.set_source_size(this->context->width, this->context->height);
-		swscale.set_target_size(this->context->width, this->context->height);
-		swscale.set_source_format(this->context->pix_fmt);
-		swscale.set_target_format(this->context->pix_fmt);
-		swscale.set_source_color(this->context->color_range, this->context->colorspace);
-		swscale.set_target_color(this->context->color_range, this->context->colorspace);
 
 		if (!swscale.initialize(SWS_FAST_BILINEAR)) {
 			PLOG_ERROR(
@@ -656,26 +688,14 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder) : self(e
 			    "range '%s'.",
 			    ffmpeg::tools::get_pixel_format_name(this->context->pix_fmt),
 			    ffmpeg::tools::get_color_space_name(this->context->colorspace),
-			    swscale.is_source_full_range() ? "Full" : "Partial");
+			    this->swscale.is_source_full_range() ? "Full" : "Partial");
 			throw std::runtime_error("failed to initialize swscaler.");
 		}
 
 		// Create Frame queue
-		frame_queue.set_pixel_format(this->context->pix_fmt);
-		frame_queue.set_resolution(this->context->width, this->context->height);
-		if (obs_data_get_bool(settings, P_MULTITHREADING_FRAMEQUEUE)) {
-			if (this->context->thread_count > 0) {
-				this->frame_queue.precache(this->context->thread_count);
-			} else {
-				if (this->context->thread_type != 0) {
-					this->frame_queue.precache(std::thread::hardware_concurrency());
-				} else {
-					this->frame_queue.precache(1);
-				}
-			}
-		} else {
-			this->frame_queue.precache(1);
-		}
+		this->frame_queue.set_pixel_format(this->context->pix_fmt);
+		this->frame_queue.set_resolution(this->context->width, this->context->height);
+		this->frame_queue.precache(std::thread::hardware_concurrency());
 	} else if (this->codec->type == AVMEDIA_TYPE_AUDIO) {
 	}
 
@@ -706,9 +726,92 @@ bool encoder::generic::update(obs_data_t* settings)
 	return false;
 }
 
-bool encoder::generic::encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
+bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
 {
-	return false;
+	int res = 0;
+
+	bool have_pushed_frame = false;
+	bool have_pulled_frame = false;
+
+	auto loop_begin = std::chrono::high_resolution_clock::now();
+	auto loop_time  = std::chrono::nanoseconds(
+            static_cast<int64_t>(1000.0 * this->context->time_base.den / this->context->time_base.num) * lag_in_frames);
+	if ((lag_in_frames - frame_count) > 0) {
+		loop_time = std::chrono::nanoseconds(1);
+	}
+
+	while (!have_pulled_frame || !have_pushed_frame) {
+		if (!have_pushed_frame) {
+			AVFrame* vframe = frame_queue.pop();
+			vframe->pts     = frame->pts;
+
+			vframe->color_range = this->context->color_range;
+			vframe->colorspace  = this->context->colorspace;
+
+			{
+				res = swscale.convert(reinterpret_cast<uint8_t**>(frame->data),
+				                      reinterpret_cast<int*>(frame->linesize), 0, this->context->height,
+				                      vframe->data, vframe->linesize);
+				if (res <= 0) {
+					PLOG_ERROR("Failed to convert frame: %s (%ld).",
+					           ffmpeg::tools::get_error_description(res), res);
+					return false;
+				}
+			}
+
+			{
+				res = avcodec_send_frame(this->context, vframe);
+				if (res < 0) {
+					PLOG_ERROR("Failed to encode frame: %s (%ld).",
+					           ffmpeg::tools::get_error_description(res), res);
+					return false;
+				}
+			}
+
+			frame_queue_used.push(vframe);
+			have_pushed_frame = true;
+			frame_count++;
+		}
+
+		if (!have_pulled_frame) {
+			res = avcodec_receive_packet(this->context, this->current_packet);
+			if (res < 0) {
+				if (res == AVERROR(EAGAIN)) {
+					*received_packet  = false;
+					have_pulled_frame = true;
+				} else if (res == AVERROR(EOF)) {
+					*received_packet  = false;
+					have_pulled_frame = true;
+				} else {
+					PLOG_ERROR("Failed to receive packet: %s (%ld).",
+					           ffmpeg::tools::get_error_description(res), res);
+					return false;
+				}
+			} else {
+				AVFrame* uframe = frame_queue_used.pop_only();
+				if (uframe) {
+					frame_queue.push(uframe);
+				}
+				packet->type          = OBS_ENCODER_VIDEO;
+				packet->pts           = this->current_packet->pts;
+				packet->dts           = this->current_packet->pts;
+				packet->data          = this->current_packet->data;
+				packet->size          = this->current_packet->size;
+				packet->keyframe      = !!(this->current_packet->flags & AV_PKT_FLAG_KEY);
+				packet->drop_priority = 0;
+				*received_packet      = true;
+				have_pulled_frame     = true;
+			}
+		}
+
+		if ((std::chrono::high_resolution_clock::now() - loop_begin) >= loop_time) {
+			break;
+		} else {
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+	}
+
+	return true;
 }
 
 void encoder::generic::get_audio_info(audio_convert_info* info) {}
@@ -716,6 +819,11 @@ void encoder::generic::get_audio_info(audio_convert_info* info) {}
 size_t encoder::generic::get_frame_size()
 {
 	return size_t();
+}
+
+bool encoder::generic::audio_encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
+{
+	return false;
 }
 
 void encoder::generic::get_video_info(video_scale_info* info) {}
@@ -735,8 +843,8 @@ bool encoder::generic::get_extra_data(uint8_t** extra_data, size_t* size)
 	return true;
 }
 
-bool encoder::generic::encode_texture(uint32_t handle, int64_t pts, uint64_t lock_key, uint64_t* next_key,
-                                      encoder_packet* packet, bool* received_packet)
+bool encoder::generic::video_encode_texture(uint32_t handle, int64_t pts, uint64_t lock_key, uint64_t* next_key,
+                                            encoder_packet* packet, bool* received_packet)
 {
 	return false;
 }

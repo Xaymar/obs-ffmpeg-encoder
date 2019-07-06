@@ -64,6 +64,9 @@ namespace encoder {
 		ffmpeg::swscale       swscale;
 		AVPacket*             current_packet = nullptr;
 
+		int64_t lag_in_frames;
+		int64_t frame_count;
+
 		public:
 		generic(obs_data_t* settings, obs_encoder_t* encoder);
 		virtual ~generic();
@@ -74,12 +77,12 @@ namespace encoder {
 
 		bool update(obs_data_t* settings);
 
-		bool encode(struct encoder_frame* frame, struct encoder_packet* packet, bool* received_packet);
-
 		// Audio only
 		void get_audio_info(struct audio_convert_info* info);
 
 		size_t get_frame_size();
+
+		bool audio_encode(struct encoder_frame* frame, struct encoder_packet* packet, bool* received_packet);
 
 		// Video only
 		void get_video_info(struct video_scale_info* info);
@@ -88,8 +91,9 @@ namespace encoder {
 
 		bool get_extra_data(uint8_t** extra_data, size_t* size);
 
-		// GPU Video only
-		bool encode_texture(uint32_t handle, int64_t pts, uint64_t lock_key, uint64_t* next_key,
-		                    struct encoder_packet* packet, bool* received_packet);
+		bool video_encode(struct encoder_frame* frame, struct encoder_packet* packet, bool* received_packet);
+
+		bool video_encode_texture(uint32_t handle, int64_t pts, uint64_t lock_key, uint64_t* next_key,
+		                          struct encoder_packet* packet, bool* received_packet);
 	};
 } // namespace encoder
