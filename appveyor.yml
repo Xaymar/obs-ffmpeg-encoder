@@ -12,7 +12,7 @@ image:
 
 environment:
   CMAKE_SYSTEM_VERSION: 10.0.17134.0
-  PACKAGE_PREFIX: xmr-ffmpeg-encoders
+  PACKAGE_PREFIX: obs-ffmpeg-encoder
   INNOSETUP_URL: http://www.jrsoftware.org/download.php/is.exe
   CURL_VERSION: 7.39.0
 
@@ -39,9 +39,9 @@ test: off
 
 # Artifacts
 artifacts:
-  - path: build/xmr-ffmpeg-encoders-*.zip
-  - path: build/xmr-ffmpeg-encoders-*.7z
-  - path: build/xmr-ffmpeg-encoders-*.exe
+  - path: build/obs-ffmpeg-encoder-*.zip
+  - path: build/obs-ffmpeg-encoder-*.7z
+  - path: build/obs-ffmpeg-encoder-*.exe
 
 # Deploying
 deploy:
