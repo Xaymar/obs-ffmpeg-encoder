@@ -19,11 +19,14 @@
 #define OBS_FFMPEG_FFMPEG_AVFRAME_QUEUE
 #pragma once
 
-#include <mutex>
 #include <deque>
+#include <mutex>
 
 extern "C" {
+#pragma warning(push)
+#pragma warning(disable : 4244)
 #include <libavutil/frame.h>
+#pragma warning(pop)
 }
 
 namespace ffmpeg {
@@ -62,8 +65,6 @@ namespace ffmpeg {
 		bool empty();
 
 		size_t size();
-
-
 	};
 } // namespace ffmpeg
 
