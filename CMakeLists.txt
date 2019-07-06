@@ -52,7 +52,7 @@ endif()
 
 # Define Project
 project(
-	xmr-ffmpeg-encoders
+	obs-ffmpeg-encoder
 	VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_TWEAK}
 )
 set(PROJECT_FULL_NAME "FFMPEG Encoder for OBS Studio")
@@ -268,6 +268,8 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/plugin.hpp"
 	"${PROJECT_SOURCE_DIR}/source/utility.cpp"
 	"${PROJECT_SOURCE_DIR}/source/utility.hpp"
+	"${PROJECT_SOURCE_DIR}/source/encoders/generic.hpp"
+	"${PROJECT_SOURCE_DIR}/source/encoders/generic.cpp"
 	"${PROJECT_SOURCE_DIR}/source/encoders/prores_aw.hpp"
 	"${PROJECT_SOURCE_DIR}/source/encoders/prores_aw.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/avframe-queue.cpp"

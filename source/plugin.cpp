@@ -16,10 +16,12 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
 #include "plugin.hpp"
+#include <memory>
 #include <obs-module.h>
 #include <obs.h>
 #include "utility.hpp"
 
+#include "encoders/generic.hpp"
 #include "encoders/prores_aw.hpp"
 
 extern "C" {
@@ -29,10 +31,27 @@ extern "C" {
 #pragma warning(pop)
 }
 
+static std::map<AVCodec*, std::shared_ptr<encoder::generic_factory>> generic_factories;
+
 MODULE_EXPORT bool obs_module_load(void)
 {
 	try {
 		avcodec_register_all();
+
+		// Register all codecs.
+		AVCodec* cdc = nullptr;
+		while ((cdc = av_codec_next(cdc)) != nullptr) {
+			if ((!cdc->encode2) && (!cdc->send_frame))
+				continue;
+
+			if ((cdc->type == AVMediaType::AVMEDIA_TYPE_AUDIO)
+			    || (cdc->type == AVMediaType::AVMEDIA_TYPE_VIDEO)) {
+				auto ptr = std::make_shared<encoder::generic_factory>(cdc);
+				ptr->register_encoder();
+				generic_factories.emplace(cdc, ptr);
+			}
+		}
+
 		obsffmpeg::encoder::prores_aw::initialize();
 		return true;
 	} catch (std::exception ex) {
