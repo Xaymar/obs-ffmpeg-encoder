@@ -241,9 +241,9 @@ obsffmpeg::encoder::prores_aw::~prores_aw()
 	}
 }
 
-void obsffmpeg::encoder::prores_aw::get_properties(obs_properties_t* props) {}
+void obsffmpeg::encoder::prores_aw::get_properties(obs_properties_t*) {}
 
-bool obsffmpeg::encoder::prores_aw::update(obs_data_t* settings)
+bool obsffmpeg::encoder::prores_aw::update(obs_data_t*)
 {
 	return false;
 }
@@ -258,12 +258,12 @@ bool obsffmpeg::encoder::prores_aw::get_extra_data(uint8_t** extra_data, size_t*
 	return true;
 }
 
-bool obsffmpeg::encoder::prores_aw::get_sei_data(uint8_t** sei_data, size_t* size)
+bool obsffmpeg::encoder::prores_aw::get_sei_data(uint8_t**, size_t*)
 {
 	return false;
 }
 
-void obsffmpeg::encoder::prores_aw::get_video_info(video_scale_info* info)
+void obsffmpeg::encoder::prores_aw::get_video_info(video_scale_info*)
 {
 	return;
 }

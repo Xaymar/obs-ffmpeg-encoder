@@ -20,8 +20,8 @@
 #pragma once
 
 #include <encoder.hpp>
-#include "ffmpeg/avframe-queue.hpp"
 #include <vector>
+#include "ffmpeg/avframe-queue.hpp"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -31,21 +31,20 @@ namespace obsffmpeg {
 	namespace encoder {
 		class prores_aw : base {
 			enum class profile {
-				Auto             = FF_PROFILE_UNKNOWN,
-				Proxy            = 0 /*FF_PROFILE_PRORES_PROXY*/,
-				Light            = 1 /*FF_PROFILE_PRORES_LT*/,
-				Standard         = 2 /*FF_PROFILE_PRORES_STANDARD*/,
-				HighQuality      = 3 /*FF_PROFILE_PRORES_HQ*/,
-				FourFourFourFour = 4 /*FF_PROFILE_PRORES_4444*/ // Automatically set if I444 or RGB input.
+				Auto        = FF_PROFILE_UNKNOWN,
+				Proxy       = 0 /*FF_PROFILE_PRORES_PROXY*/,
+				Light       = 1 /*FF_PROFILE_PRORES_LT*/,
+				Standard    = 2 /*FF_PROFILE_PRORES_STANDARD*/,
+				HighQuality = 3 /*FF_PROFILE_PRORES_HQ*/,
+				FourFourFourFour =
+				    4 /*FF_PROFILE_PRORES_4444*/ // Automatically set if I444 or RGB input.
 			};
 
 			private:
-			profile video_profile = profile::Auto;
+			profile               video_profile = profile::Auto;
 			ffmpeg::avframe_queue frame_queue;
 			ffmpeg::avframe_queue frame_queue_used;
-			AVPacket* current_packet = nullptr;
-
-			
+			AVPacket*             current_packet = nullptr;
 
 			public:
 			prores_aw(obs_data_t* settings, obs_encoder_t* encoder);
