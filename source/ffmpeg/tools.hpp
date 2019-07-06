@@ -20,6 +20,7 @@
 #pragma once
 
 #include <obs.h>
+#include <string>
 
 extern "C" {
 #include <libavutil/pixfmt.h>
@@ -27,6 +28,8 @@ extern "C" {
 
 namespace ffmpeg {
 	namespace tools {
+		std::string translate_encoder_capabilities(int capabilities);
+
 		const char* get_pixel_format_name(AVPixelFormat v);
 
 		const char* get_color_space_name(AVColorSpace v);
@@ -38,7 +41,7 @@ namespace ffmpeg {
 		AVColorSpace obs_videocolorspace_to_avcolorspace(video_colorspace v);
 
 		AVColorRange obs_videorangetype_to_avcolorrange(video_range_type v);
-	}
+	} // namespace tools
 } // namespace ffmpeg
 
 #endif OBS_FFMPEG_FFMPEG_UTILITY
