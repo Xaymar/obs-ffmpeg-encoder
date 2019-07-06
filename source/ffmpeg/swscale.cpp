@@ -94,7 +94,11 @@ void ffmpeg::swscale::set_target_size(uint32_t width, uint32_t height)
 	target_size.second = height;
 }
 
-void ffmpeg::swscale::get_target_size(uint32_t& width, uint32_t& height) {}
+void ffmpeg::swscale::get_target_size(uint32_t& width, uint32_t& height)
+{
+	width  = target_size.first;
+	height = target_size.second;
+}
 
 std::pair<uint32_t, uint32_t> ffmpeg::swscale::get_target_size()
 {

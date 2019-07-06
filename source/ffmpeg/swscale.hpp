@@ -23,8 +23,11 @@
 #include <utility>
 
 extern "C" {
+#pragma warning(push)
+#pragma warning(disable : 4244)
 #include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
+#pragma warning(pop)
 }
 
 namespace ffmpeg {
