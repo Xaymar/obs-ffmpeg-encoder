@@ -111,8 +111,8 @@ void obsffmpeg::ui::debug_handler::get_properties(obs_properties_t* props, AVCod
 			} else {
 				auto unit_type = unit_types.find(opt->unit);
 				if (unit_type == unit_types.end()) {
-					PLOG_INFO("  [%s] Constant '%s' and help text '%s' for missing unit.",
-					          opt->unit, opt->name, opt->help);
+					PLOG_INFO("  [%s] Flag '%s' and help text '%s' with value '%llX'.", opt->unit,
+					          opt->name, opt->help, opt->default_val.i64);
 				} else {
 					std::string out;
 					switch (unit_type->second) {
