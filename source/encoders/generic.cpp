@@ -315,7 +315,7 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 			                            obs_text_type::OBS_TEXT_DEFAULT);
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_CUSTOMSETTINGS)));
 		}
-		{
+		if (this->avcodec_ptr->pix_fmts) {
 			auto p = obs_properties_add_list(prs, P_FFMPEG_COLORFORMAT, TRANSLATE(P_FFMPEG_COLORFORMAT),
 			                                 OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_COLORFORMAT)));
@@ -514,6 +514,10 @@ void encoder::generic::get_properties(obs_properties_t* props)
 			ptr->get_properties(props, this->codec, this->context);
 		}
 	}
+
+	obs_property_set_enabled(obs_properties_get(props, P_FFMPEG_COLORFORMAT), false);
+	obs_property_set_enabled(obs_properties_get(props, P_FFMPEG_THREADS), false);
+	obs_property_set_enabled(obs_properties_get(props, P_FFMPEG_STANDARDCOMPLIANCE), false);
 }
 
 bool encoder::generic::update(obs_data_t* settings)
