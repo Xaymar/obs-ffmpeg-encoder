@@ -273,9 +273,9 @@ bool obsffmpeg::encoder::prores_aw::encode(encoder_frame* frame, encoder_packet*
 	int res = 0;
 
 	{
-		ScopeProfiler sp_frame("frame");
-		AVFrame*      vframe = frame_queue.pop();
-		vframe->pts          = frame->pts;
+		ScopeProfiler            sp_frame("frame");
+		std::shared_ptr<AVFrame> vframe = frame_queue.pop();
+		vframe->pts                     = frame->pts;
 
 		vframe->color_range = this->avcontext->color_range;
 		vframe->colorspace  = this->avcontext->colorspace;
@@ -294,7 +294,7 @@ bool obsffmpeg::encoder::prores_aw::encode(encoder_frame* frame, encoder_packet*
 
 		{
 			ScopeProfiler profile("send");
-			res = avcodec_send_frame(this->avcontext, vframe);
+			res = avcodec_send_frame(this->avcontext, vframe.get());
 			if (res < 0) {
 				PLOG_ERROR(LOG_PREFIX "Failed to encode frame: %s (%ld).",
 				           ffmpeg::tools::get_error_description(res), res);
@@ -320,12 +320,10 @@ bool obsffmpeg::encoder::prores_aw::encode(encoder_frame* frame, encoder_packet*
 				return false;
 			}
 		} else {
-			AVFrame* uframe = frame_queue_used.pop_only();
+			std::shared_ptr<AVFrame> uframe = frame_queue_used.pop_only();
 			if (uframe) {
 				if (frame_queue.empty()) {
 					frame_queue.push(uframe);
-				} else {
-					av_frame_free(&uframe);
 				}
 			}
 			packet->type          = OBS_ENCODER_VIDEO;

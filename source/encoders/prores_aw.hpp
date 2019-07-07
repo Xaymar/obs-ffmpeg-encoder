@@ -15,8 +15,6 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
-#ifndef OBS_FFMPEG_ENCODER_PRORES_AW
-#define OBS_FFMPEG_ENCODER_PRORES_AW
 #pragma once
 
 #include <encoder.hpp>
@@ -75,5 +73,3 @@ namespace obsffmpeg {
 		};
 	} // namespace encoder
 } // namespace obsffmpeg
-
-#endif OBS_FFMPEG_ENCODER_PRORES_AW
