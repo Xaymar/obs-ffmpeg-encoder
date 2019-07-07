@@ -17,14 +17,15 @@
 
 #include "plugin.hpp"
 #include <memory>
-#include <obs-module.h>
-#include <obs.h>
-#include "utility.hpp"
-
 #include "encoders/generic.hpp"
 #include "encoders/prores_aw.hpp"
+#include "ui/debug_handler.hpp"
+#include "ui/handler.hpp"
+#include "utility.hpp"
 
 extern "C" {
+#include <obs-module.h>
+#include <obs.h>
 #pragma warning(push)
 #pragma warning(disable : 4244)
 #include <libavcodec/avcodec.h>
@@ -38,6 +39,7 @@ std::list<std::function<void()>> obsffmpeg::finalizers;
 
 // Codec to Handler mapping.
 static std::map<std::string, std::shared_ptr<obsffmpeg::ui::handler>> codec_to_handler_map;
+static std::shared_ptr<obsffmpeg::ui::handler> debug_handler = std::make_shared<obsffmpeg::ui::debug_handler>();
 
 void obsffmpeg::register_codec_handler(std::string codec, std::shared_ptr<obsffmpeg::ui::handler> handler)
 {
@@ -48,7 +50,7 @@ std::shared_ptr<obsffmpeg::ui::handler> obsffmpeg::find_codec_handler(std::strin
 {
 	auto found = codec_to_handler_map.find(codec);
 	if (found == codec_to_handler_map.end())
-		return nullptr;
+		return debug_handler;
 	return found->second;
 }
 
