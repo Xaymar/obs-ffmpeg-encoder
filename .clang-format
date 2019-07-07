@@ -67,7 +67,7 @@ BreakBeforeBraces: Custom
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeColon
 #BreakInheritanceList: BeforeColon
-BreakStringLiterals: true
+BreakStringLiterals: false
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 Cpp11BracedListStyle: true
  
