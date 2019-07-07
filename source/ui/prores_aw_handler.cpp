@@ -42,9 +42,9 @@ void obsffmpeg::ui::prores_aw_handler::get_defaults(obs_data_t* settings, AVCode
 	obs_data_set_default_int(settings, P_PROFILE, 0);
 }
 
-void obsffmpeg::ui::prores_aw_handler::get_properties(obs_properties_t* props, AVCodec* codec, AVCodecContext*)
+void obsffmpeg::ui::prores_aw_handler::get_properties(obs_properties_t* props, AVCodec* codec, AVCodecContext* context)
 {
-	{
+	if (!context) {
 		auto p = obs_properties_add_list(props, P_PROFILE, TRANSLATE(P_PROFILE), OBS_COMBO_TYPE_LIST,
 		                                 OBS_COMBO_FORMAT_INT);
 		obs_property_set_long_description(p, TRANSLATE(DESC(P_PROFILE)));
@@ -68,10 +68,12 @@ void obsffmpeg::ui::prores_aw_handler::get_properties(obs_properties_t* props, A
 				obs_property_list_add_int(p, ptr->name, ptr->profile);
 			}
 		}
+	} else {
+		obs_property_set_enabled(obs_properties_get(props, P_PROFILE), false);
 	}
 }
 
-void obsffmpeg::ui::prores_aw_handler::update(obs_data_t* settings, AVCodec* codec, AVCodecContext* context)
+void obsffmpeg::ui::prores_aw_handler::update(obs_data_t* settings, AVCodec*, AVCodecContext* context)
 {
-	context->profile = obs_data_get_int(settings, P_PROFILE);
+	context->profile = static_cast<int>(obs_data_get_int(settings, P_PROFILE));
 }
