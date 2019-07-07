@@ -31,44 +31,56 @@ extern "C" {
 #pragma warning(pop)
 }
 
+// Initializers and finalizers.
+std::list<std::function<void()>> obsffmpeg::initializers;
+
+std::list<std::function<void()>> obsffmpeg::finalizers;
+
 static std::map<AVCodec*, std::shared_ptr<encoder::generic_factory>> generic_factories;
 
 MODULE_EXPORT bool obs_module_load(void)
-{
-	try {
-		avcodec_register_all();
+try {
+	// Initialize avcodec.
+	avcodec_register_all();
 
-		// Register all codecs.
-		AVCodec* cdc = nullptr;
-		while ((cdc = av_codec_next(cdc)) != nullptr) {
-			if (!av_codec_is_encoder(cdc))
-				continue;
-
-			if ((cdc->type == AVMediaType::AVMEDIA_TYPE_AUDIO)
-			    || (cdc->type == AVMediaType::AVMEDIA_TYPE_VIDEO)) {
-				auto ptr = std::make_shared<encoder::generic_factory>(cdc);
-				ptr->register_encoder();
-				generic_factories.emplace(cdc, ptr);
-			}
-		}
-
-		obsffmpeg::encoder::prores_aw::initialize();
-		return true;
-	} catch (std::exception ex) {
-		PLOG_ERROR("Exception during initalization: %s.", ex.what());
-	} catch (...) {
-		PLOG_ERROR("Unrecognized exception during initalization.");
+	// Run all initializers.
+	for (auto func : obsffmpeg::initializers) {
+		func();
 	}
+
+	// Register all codecs.
+	AVCodec* cdc = nullptr;
+	while ((cdc = av_codec_next(cdc)) != nullptr) {
+		if (!av_codec_is_encoder(cdc))
+			continue;
+
+		if ((cdc->type == AVMediaType::AVMEDIA_TYPE_AUDIO) || (cdc->type == AVMediaType::AVMEDIA_TYPE_VIDEO)) {
+			auto ptr = std::make_shared<encoder::generic_factory>(cdc);
+			ptr->register_encoder();
+			generic_factories.emplace(cdc, ptr);
+		}
+	}
+
+	obsffmpeg::encoder::prores_aw::initialize();
+	return true;
+} catch (std::exception ex) {
+	PLOG_ERROR("Exception during initalization: %s.", ex.what());
+	return false;
+} catch (...) {
+	PLOG_ERROR("Unrecognized exception during initalization.");
 	return false;
 }
 
 MODULE_EXPORT void obs_module_unload(void)
-{
-	try {
-		obsffmpeg::encoder::prores_aw::finalize();
-	} catch (std::exception ex) {
-		PLOG_ERROR("Exception during finalizing: %s.", ex.what());
-	} catch (...) {
-		PLOG_ERROR("Unrecognized exception during finalizing.");
+try {
+	obsffmpeg::encoder::prores_aw::finalize();
+
+	// Run all finalizers.
+	for (auto func : obsffmpeg::finalizers) {
+		func();
 	}
+} catch (std::exception ex) {
+	PLOG_ERROR("Exception during finalizing: %s.", ex.what());
+} catch (...) {
+	PLOG_ERROR("Unrecognized exception during finalizing.");
 }

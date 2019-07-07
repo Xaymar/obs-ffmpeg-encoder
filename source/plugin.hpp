@@ -1,5 +1,5 @@
 // FFMPEG Video Encoder Integration for OBS Studio
-// Copyright (C) 2018 - 2018 Michael Fabian Dirks
+// Copyright (C) 2018 - 2019 Michael Fabian Dirks
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,16 +15,18 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
-#ifndef OBS_FFMPEG_PLUGIN_HPP
-#define OBS_FFMPEG_PLUGIN_HPP
 #pragma once
-
 #include <functional>
 #include <list>
+#include <memory>
+#include <obs-module.h>
 
 namespace obsffmpeg {
+	extern std::list<std::function<void()>> initializers;
 
+	extern std::list<std::function<void()>> finalizers;
 
 } // namespace obsffmpeg
 
-#endif OBS_FFMPEG_PLUGIN_HPP
+MODULE_EXPORT bool obs_module_load(void);
+MODULE_EXPORT void obs_module_unload(void);
