@@ -191,11 +191,6 @@ endif()
 
 # Load OBS Studio
 if(${PropertyPrefix}OBS_NATIVE)
-	option(BUILD_FFMPEG_ENCODER "Build AMD Encoder module" ON)	
-	if (NOT BUILD_FFMPEG_ENCODER)
-		message(STATUS "Not building AMD Encoder")
-		return()
-	endif()
 elseif(${PropertyPrefix}OBS_PACKAGE)
 	include("${OBS_STUDIO_DIR}/cmake/LibObs/LibObsConfig.cmake")
 elseif(${PropertyPrefix}OBS_REFERENCE)
@@ -285,9 +280,6 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/ui/prores_aw_handler.hpp"
 	"${PROJECT_SOURCE_DIR}/source/ui/prores_aw_handler.cpp"
 )
-
-
-
 
 # Source Grouping
 source_group(TREE "${PROJECT_SOURCE_DIR}" PREFIX "Data Files" FILES ${PROJECT_DATA})
