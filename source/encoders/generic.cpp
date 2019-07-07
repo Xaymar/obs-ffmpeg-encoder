@@ -598,6 +598,8 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 
 		while ((!sent_frame || (should_lag && !recv_packet))
 		       && !(std::chrono::high_resolution_clock::now() > loop_end)) {
+			bool eagain_is_stupid = false;
+
 			if (!sent_frame) {
 				ScopeProfiler profile_inner("send");
 
@@ -606,7 +608,6 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 				int res = send_frame(vframe);
 				switch (res) {
 				case 0:
-					PLOG_DEBUG("Sent frame at PTS %lld.", frame->pts);
 					sent_frame = true;
 					frame_count++;
 					break;
@@ -614,13 +615,12 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 					// This means we should call receive_packet again, but what do we do with that data?
 					// Why can't we queue on both? Do I really have to implement threading for this stuff?
 					if (*received_packet == true) {
-						PLOG_ERROR(
+						PLOG_WARNING(
 						    "Skipped frame due to EAGAIN when a packet was already returned.");
 						sent_frame = true;
 						frame_count++;
-					} else {
-						PLOG_DEBUG("Received EAGAIN, but had no input packet yet");
 					}
+					eagain_is_stupid = true;
 					break;
 				case AVERROR(EOF):
 					PLOG_ERROR("Skipped frame due to end of stream.");
@@ -639,7 +639,6 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 				int res = receive_packet(received_packet, packet);
 				switch (res) {
 				case 0:
-					PLOG_DEBUG("Received packet with PTS %lld.", this->current_packet->pts);
 					recv_packet = true;
 					break;
 				case AVERROR(EOF):
@@ -648,10 +647,11 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 					break;
 				case AVERROR(EAGAIN):
 					if (sent_frame) {
-						PLOG_DEBUG("Not enough input frames yet.");
 						recv_packet = true;
-					} else {
-						PLOG_DEBUG("Not enough input frames, waiting on new frame.");
+					}
+					if (eagain_is_stupid) {
+						PLOG_ERROR("Both send and recieve returned EAGAIN, encoder is broken.");
+						return false;
 					}
 					break;
 				default:
