@@ -592,56 +592,66 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 		}
 	}
 
-	// Send a new frame.
+	// Send and receive frames.
 	{
-		ScopeProfiler profile_inner("send");
+		ScopeProfiler profile("loop");
+		bool          sent_frame  = false;
+		bool          recv_packet = false;
+		bool          should_lag  = (lag_in_frames - frame_count) <= 0;
 
-		vframe->pts = frame->pts;
+		while (!sent_frame || (should_lag && !recv_packet)) {
+			if (!sent_frame) {
+				ScopeProfiler profile_inner("send");
 
-		int res = send_frame(vframe);
-		switch (res) {
-		case 0:
-			break;
-		case AVERROR(EAGAIN):
-			// This means we should call receive_packet again, but what do we do with that data?
-			// Why can't we queue on both? Do I really have to implement threading for this stuff?
-			if (*received_packet == true) {
-				PLOG_ERROR(
-				    "Encoder wanted us to retrieve a packet before allowing us to submit more. Skipped "
-				    "frame.");
-			}
-			break;
-		case AVERROR(EOF):
-			break;
-		default:
-			PLOG_ERROR("Failed to encode frame: %s (%ld).", ffmpeg::tools::get_error_description(res), res);
-			return false;
-		}
-	}
+				vframe->pts = frame->pts;
 
-	// Try and receive packet late.
-	{
-		ScopeProfiler profile_inner("recieve_late");
-
-		bool should_lag = (lag_in_frames - frame_count) <= 0;
-		bool early_exit = false;
-
-		while ((should_lag && !*received_packet) && !early_exit) {
-			int res = receive_packet(received_packet, packet);
-			switch (res) {
-			case 0:
-				break;
-			case AVERROR(EAGAIN):
-			case AVERROR(EOF):
-				early_exit = true;
-				break;
-			default:
-				PLOG_ERROR("Failed to receive packet: %s (%ld).",
-				           ffmpeg::tools::get_error_description(res), res);
-				return false;
+				int res = send_frame(vframe);
+				switch (res) {
+				case 0:
+					sent_frame = true;
+					break;
+				case AVERROR(EAGAIN):
+					// This means we should call receive_packet again, but what do we do with that data?
+					// Why can't we queue on both? Do I really have to implement threading for this stuff?
+					if (*received_packet == true) {
+						PLOG_ERROR(
+						    "Skipped frame due to EAGAIN when a packet was already returned.");
+						sent_frame = true;
+					}
+					break;
+				case AVERROR(EOF):
+					PLOG_ERROR("Skipped frame due to end of stream.");
+					sent_frame = true;
+					break;
+				default:
+					PLOG_ERROR("Failed to encode frame: %s (%ld).",
+					           ffmpeg::tools::get_error_description(res), res);
+					return false;
+				}
 			}
 
 			if (!*received_packet) {
+				ScopeProfiler profile_inner("recieve");
+
+				int res = receive_packet(received_packet, packet);
+				switch (res) {
+				case 0:
+				case AVERROR(EOF):
+					recv_packet = true;
+					break;
+				case AVERROR(EAGAIN):
+					if (sent_frame) {
+						recv_packet = true;
+					}
+					break;
+				default:
+					PLOG_ERROR("Failed to receive packet: %s (%ld).",
+					           ffmpeg::tools::get_error_description(res), res);
+					return false;
+				}
+			}
+
+			if (!sent_frame || !recv_packet) {
 				std::this_thread::sleep_for(std::chrono::milliseconds(1));
 			}
 		}
