@@ -722,28 +722,37 @@ bool encoder::generic::update(obs_data_t* settings)
 	return false;
 }
 
+void encoder::generic::get_audio_info(audio_convert_info*) {}
+
+size_t encoder::generic::get_frame_size()
+{
+	return size_t();
+}
+
+bool encoder::generic::audio_encode(encoder_frame*, encoder_packet*, bool*)
+{
+	return false;
+}
+
+void encoder::generic::get_video_info(video_scale_info*) {}
+
+bool encoder::generic::get_sei_data(uint8_t**, size_t*)
+{
+	return false;
+}
+
+bool encoder::generic::get_extra_data(uint8_t** extra_data, size_t* size)
+{
+	if (!this->context->extradata) {
+		return false;
+	}
+	*extra_data = this->context->extradata;
+	*size       = this->context->extradata_size;
+	return true;
+}
+
 bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
 {
-	// Retrieve empty frame.
-	AVFrame* vframe = frame_queue.pop();
-
-	// Convert frame.
-	{
-		ScopeProfiler profile("convert");
-
-		vframe->color_range = this->context->color_range;
-		vframe->colorspace  = this->context->colorspace;
-
-		int res =
-		    swscale.convert(reinterpret_cast<uint8_t**>(frame->data), reinterpret_cast<int*>(frame->linesize),
-		                    0, this->context->height, vframe->data, vframe->linesize);
-		if (res <= 0) {
-			PLOG_ERROR("Failed to convert frame: %s (%ld).", ffmpeg::tools::get_error_description(res),
-			           res);
-			return false;
-		}
-	}
-
 	// Try and receive packet early.
 	{
 		ScopeProfiler profile_inner("recieve_early");
@@ -756,6 +765,24 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 			break;
 		default:
 			PLOG_ERROR("Failed to receive packet: %s (%ld).", ffmpeg::tools::get_error_description(res),
+			           res);
+			return false;
+		}
+	}
+
+	// Convert frame.
+	std::shared_ptr<AVFrame> vframe = frame_queue.pop(); // Retrieve an empty frame.
+	{
+		ScopeProfiler profile("convert");
+
+		vframe->color_range = this->context->color_range;
+		vframe->colorspace  = this->context->colorspace;
+
+		int res =
+		    swscale.convert(reinterpret_cast<uint8_t**>(frame->data), reinterpret_cast<int*>(frame->linesize),
+		                    0, this->context->height, vframe->data, vframe->linesize);
+		if (res <= 0) {
+			PLOG_ERROR("Failed to convert frame: %s (%ld).", ffmpeg::tools::get_error_description(res),
 			           res);
 			return false;
 		}
@@ -819,35 +846,6 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 	return true;
 }
 
-void encoder::generic::get_audio_info(audio_convert_info*) {}
-
-size_t encoder::generic::get_frame_size()
-{
-	return size_t();
-}
-
-bool encoder::generic::audio_encode(encoder_frame*, encoder_packet*, bool*)
-{
-	return false;
-}
-
-void encoder::generic::get_video_info(video_scale_info*) {}
-
-bool encoder::generic::get_sei_data(uint8_t**, size_t*)
-{
-	return false;
-}
-
-bool encoder::generic::get_extra_data(uint8_t** extra_data, size_t* size)
-{
-	if (!this->context->extradata) {
-		return false;
-	}
-	*extra_data = this->context->extradata;
-	*size       = this->context->extradata_size;
-	return true;
-}
-
 bool encoder::generic::video_encode_texture(uint32_t, int64_t, uint64_t, uint64_t*, encoder_packet*, bool*)
 {
 	return false;
@@ -867,23 +865,20 @@ int encoder::generic::receive_packet(bool* received_packet, struct encoder_packe
 		*received_packet      = true;
 
 		{
-			AVFrame* uframe = frame_queue_used.pop_only();
+			std::shared_ptr<AVFrame> uframe = frame_queue_used.pop_only();
 			if (frame_queue.empty()) {
 				frame_queue.push(uframe);
-			} else {
-				av_frame_free(&uframe);
 			}
 		}
 	}
 	return res;
 }
 
-int encoder::generic::send_frame(AVFrame* frame)
+int encoder::generic::send_frame(std::shared_ptr<AVFrame> frame)
 {
-	int res = avcodec_send_frame(this->context, frame);
+	int res = avcodec_send_frame(this->context, frame.get());
 	switch (res) {
 	case 0:
-		frame_queue_used.push(frame);
 		frame_count++;
 	case AVERROR(EAGAIN):
 	case AVERROR(EOF):

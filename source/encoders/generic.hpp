@@ -72,6 +72,7 @@ namespace encoder {
 		generic(obs_data_t* settings, obs_encoder_t* encoder);
 		virtual ~generic();
 
+		public: // OBS API
 		// Shared
 		void get_properties(obs_properties_t* props);
 
@@ -98,6 +99,6 @@ namespace encoder {
 
 		int receive_packet(bool* received_packet, struct encoder_packet* packet);
 
-		int send_frame(AVFrame* frame);
+		int send_frame(std::shared_ptr<AVFrame> frame);
 	};
 } // namespace encoder
