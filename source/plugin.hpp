@@ -20,11 +20,16 @@
 #include <list>
 #include <memory>
 #include <obs-module.h>
+#include "ui/handler.hpp"
 
 namespace obsffmpeg {
 	extern std::list<std::function<void()>> initializers;
 
 	extern std::list<std::function<void()>> finalizers;
+
+	void register_codec_handler(std::string codec, std::shared_ptr<obsffmpeg::ui::handler> handler);
+
+	std::shared_ptr<obsffmpeg::ui::handler> find_codec_handler(std::string codec);
 
 } // namespace obsffmpeg
 

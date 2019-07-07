@@ -36,6 +36,22 @@ std::list<std::function<void()>> obsffmpeg::initializers;
 
 std::list<std::function<void()>> obsffmpeg::finalizers;
 
+// Codec to Handler mapping.
+static std::map<std::string, std::shared_ptr<obsffmpeg::ui::handler>> codec_to_handler_map;
+
+void obsffmpeg::register_codec_handler(std::string codec, std::shared_ptr<obsffmpeg::ui::handler> handler)
+{
+	codec_to_handler_map.emplace(codec, handler);
+}
+
+std::shared_ptr<obsffmpeg::ui::handler> obsffmpeg::find_codec_handler(std::string codec)
+{
+	auto found = codec_to_handler_map.find(codec);
+	if (found == codec_to_handler_map.end())
+		return nullptr;
+	return found->second;
+}
+
 static std::map<AVCodec*, std::shared_ptr<encoder::generic_factory>> generic_factories;
 
 MODULE_EXPORT bool obs_module_load(void)
