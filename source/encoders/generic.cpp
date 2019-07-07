@@ -40,6 +40,7 @@ extern "C" {
 // FFmpeg
 #define P_FFMPEG "FFmpeg"
 #define P_FFMPEG_CUSTOMSETTINGS "FFmpeg.CustomSettings"
+#define P_FFMPEG_THREADS "FFmpeg.Threads"
 #define P_FFMPEG_COLORFORMAT "FFmpeg.ColorFormat"
 #define P_FFMPEG_STANDARDCOMPLIANCE "FFmpeg.StandardCompliance"
 
@@ -292,6 +293,7 @@ void encoder::generic_factory::get_defaults(obs_data_t* settings)
 		// FFmpeg
 		obs_data_set_default_string(settings, P_FFMPEG_CUSTOMSETTINGS, "");
 		obs_data_set_default_int(settings, P_FFMPEG_COLORFORMAT, AV_PIX_FMT_NONE);
+		obs_data_set_default_int(settings, P_FFMPEG_THREADS, 0);
 		obs_data_set_default_int(settings, P_FFMPEG_STANDARDCOMPLIANCE, FF_COMPLIANCE_STRICT);
 	}
 }
@@ -321,6 +323,11 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 			for (auto ptr = this->avcodec_ptr->pix_fmts; *ptr != AV_PIX_FMT_NONE; ptr++) {
 				obs_property_list_add_int(p, ffmpeg::tools::get_pixel_format_name(*ptr), *ptr);
 			}
+		}
+		{
+			auto p = obs_properties_add_int_slider(prs, P_FFMPEG_THREADS, TRANSLATE(P_FFMPEG_THREADS), 0,
+			                                       std::thread::hardware_concurrency() * 2, 1);
+			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_THREADS)));
 		}
 		{
 			auto p = obs_properties_add_list(prs, P_FFMPEG_STANDARDCOMPLIANCE,
@@ -379,12 +386,18 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 	} else {
 		this->context->thread_type = 0;
 	}
-	if (this->codec->capabilities & AV_CODEC_CAP_AUTO_THREADS) {
-		this->context->thread_count = 0;
-		this->lag_in_frames         = std::thread::hardware_concurrency();
-	} else {
-		this->context->thread_count = std::thread::hardware_concurrency();
+	int64_t threads = obs_data_get_int(settings, P_FFMPEG_THREADS);
+	if (threads > 0) {
+		this->context->thread_count = static_cast<int>(threads);
 		this->lag_in_frames         = this->context->thread_count;
+	} else {
+		if (this->codec->capabilities & AV_CODEC_CAP_AUTO_THREADS) {
+			this->context->thread_count = 0;
+			this->lag_in_frames         = std::thread::hardware_concurrency();
+		} else {
+			this->context->thread_count = std::thread::hardware_concurrency();
+			this->lag_in_frames         = this->context->thread_count;
+		}
 	}
 
 	// Video and Audio exclusive setup
