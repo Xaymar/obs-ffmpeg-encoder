@@ -280,6 +280,8 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/tools.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ui/handler.hpp"
 	"${PROJECT_SOURCE_DIR}/source/ui/handler.cpp"
+	"${PROJECT_SOURCE_DIR}/source/ui/prores_aw_handler.hpp"
+	"${PROJECT_SOURCE_DIR}/source/ui/prores_aw_handler.cpp"
 )
 
 
