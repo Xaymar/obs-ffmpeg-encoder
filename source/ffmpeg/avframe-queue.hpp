@@ -15,10 +15,7 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
-#ifndef OBS_FFMPEG_FFMPEG_AVFRAME_QUEUE
-#define OBS_FFMPEG_FFMPEG_AVFRAME_QUEUE
 #pragma once
-
 #include <deque>
 #include <mutex>
 
@@ -31,14 +28,13 @@ extern "C" {
 
 namespace ffmpeg {
 	class avframe_queue {
-		std::deque<AVFrame*> frames;
-		std::mutex           lock;
+		std::deque<std::shared_ptr<AVFrame>> frames;
+		std::mutex                           lock;
 
 		std::pair<uint32_t, uint32_t> resolution;
 		AVPixelFormat                 format = AV_PIX_FMT_NONE;
 
-		AVFrame* create_frame();
-		void     destroy_frame(AVFrame* frame);
+		std::shared_ptr<AVFrame> create_frame();
 
 		public:
 		avframe_queue();
@@ -56,16 +52,14 @@ namespace ffmpeg {
 
 		void clear();
 
-		void push(AVFrame* frame);
+		void push(std::shared_ptr<AVFrame> frame);
 
-		AVFrame* pop();
+		std::shared_ptr<AVFrame> pop();
 
-		AVFrame* pop_only();
+		std::shared_ptr<AVFrame> pop_only();
 
 		bool empty();
 
 		size_t size();
 	};
 } // namespace ffmpeg
-
-#endif OBS_FFMPEG_FFMPEG_AVFRAME_QUEUE

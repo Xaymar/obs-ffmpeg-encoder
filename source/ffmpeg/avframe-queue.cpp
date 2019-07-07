@@ -18,26 +18,20 @@
 #include "avframe-queue.hpp"
 #include "tools.hpp"
 
-AVFrame* ffmpeg::avframe_queue::create_frame()
+std::shared_ptr<AVFrame> ffmpeg::avframe_queue::create_frame()
 {
-	AVFrame* frame = av_frame_alloc();
-	frame->width   = this->resolution.first;
-	frame->height  = this->resolution.second;
-	frame->format  = this->format;
-	int res        = av_frame_get_buffer(frame, 0);
+	std::shared_ptr<AVFrame> frame =
+	    std::shared_ptr<AVFrame>(av_frame_alloc(), [](AVFrame* frame) { av_frame_free(&frame); });
+	frame->width  = this->resolution.first;
+	frame->height = this->resolution.second;
+	frame->format = this->format;
+
+	int res = av_frame_get_buffer(frame.get(), 0);
 	if (res < 0) {
 		throw std::exception(ffmpeg::tools::get_error_description(res));
 	}
 
 	return frame;
-}
-
-void ffmpeg::avframe_queue::destroy_frame(AVFrame* frame)
-{
-	if (frame == nullptr)
-		return;
-
-	av_frame_free(&frame);
 }
 
 ffmpeg::avframe_queue::avframe_queue() {}
@@ -89,23 +83,19 @@ void ffmpeg::avframe_queue::precache(size_t count)
 void ffmpeg::avframe_queue::clear()
 {
 	std::unique_lock<std::mutex> ulock(this->lock);
-	for (AVFrame* frame : frames) {
-		destroy_frame(frame);
-	}
 	frames.clear();
 }
 
-void ffmpeg::avframe_queue::push(AVFrame* frame)
+void ffmpeg::avframe_queue::push(std::shared_ptr<AVFrame> frame)
 {
 	std::unique_lock<std::mutex> ulock(this->lock);
 	frames.push_back(frame);
 }
 
-AVFrame* ffmpeg::avframe_queue::pop()
+std::shared_ptr<AVFrame> ffmpeg::avframe_queue::pop()
 {
 	std::unique_lock<std::mutex> ulock(this->lock);
-
-	AVFrame* ret = nullptr;
+	std::shared_ptr<AVFrame>     ret;
 	while (ret == nullptr) {
 		if (frames.size() == 0) {
 			ret = create_frame();
@@ -117,7 +107,6 @@ AVFrame* ffmpeg::avframe_queue::pop()
 				frames.pop_front();
 				if ((ret->width != this->resolution.first) || (ret->height != this->resolution.second)
 				    || (ret->format != this->format)) {
-					destroy_frame(ret);
 					ret = nullptr;
 				}
 			}
@@ -126,13 +115,13 @@ AVFrame* ffmpeg::avframe_queue::pop()
 	return ret;
 }
 
-AVFrame* ffmpeg::avframe_queue::pop_only()
+std::shared_ptr<AVFrame> ffmpeg::avframe_queue::pop_only()
 {
 	std::unique_lock<std::mutex> ulock(this->lock);
 	if (frames.size() == 0) {
 		return nullptr;
 	}
-	AVFrame* ret = frames.front();
+	std::shared_ptr<AVFrame> ret = frames.front();
 	if (ret == nullptr) {
 		return nullptr;
 	}
