@@ -34,19 +34,13 @@ extern "C" {
 #pragma warning(pop)
 }
 
-// Rate Control
-#define P_RATECONTROL "RateControl"
-#define P_RATECONTROL_PROFILE "RateControl.Profile"
-#define P_RATECONTROL_BITRATE "RateControl.Bitrate"
-#define P_RATECONTROL_MAXBITRATE "RateControl.MaxBitrate"
-#define P_RATECONTROL_VBVBUFFER "RateControl.VBVBuffer"
-#define P_RATECONTROL_KEYFRAME "RateControl.KeyFrame"
-#define P_RATECONTROL_KEYFRAME_TYPE "RateControl.KeyFrame.Type"
-#define P_RATECONTROL_KEYFRAME_INTERVAL "RateControl.KeyFrame.Interval"
+// Generic
+#define P_AUTOMATIC "Automatic"
 
 // FFmpeg
 #define P_FFMPEG "FFmpeg"
 #define P_FFMPEG_CUSTOMSETTINGS "FFmpeg.CustomSettings"
+#define P_FFMPEG_COLORFORMAT "FFmpeg.ColorFormat"
 #define P_FFMPEG_STANDARDCOMPLIANCE "FFmpeg.StandardCompliance"
 
 enum class keyframe_type { Seconds, Frames };
@@ -297,6 +291,7 @@ void encoder::generic_factory::get_defaults(obs_data_t* settings)
 	{ // Integrated Options
 		// FFmpeg
 		obs_data_set_default_string(settings, P_FFMPEG_CUSTOMSETTINGS, "");
+		obs_data_set_default_int(settings, P_FFMPEG_COLORFORMAT, AV_PIX_FMT_NONE);
 		obs_data_set_default_int(settings, P_FFMPEG_STANDARDCOMPLIANCE, FF_COMPLIANCE_STRICT);
 	}
 }
@@ -317,6 +312,15 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 			    obs_properties_add_text(prs, P_FFMPEG_CUSTOMSETTINGS, TRANSLATE(P_FFMPEG_CUSTOMSETTINGS),
 			                            obs_text_type::OBS_TEXT_DEFAULT);
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_CUSTOMSETTINGS)));
+		}
+		{
+			auto p = obs_properties_add_list(prs, P_FFMPEG_COLORFORMAT, TRANSLATE(P_FFMPEG_COLORFORMAT),
+			                                 OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_COLORFORMAT)));
+			obs_property_list_add_int(p, TRANSLATE(P_AUTOMATIC), AV_PIX_FMT_NONE);
+			for (auto ptr = this->avcodec_ptr->pix_fmts; *ptr != AV_PIX_FMT_NONE; ptr++) {
+				obs_property_list_add_int(p, ffmpeg::tools::get_pixel_format_name(*ptr), *ptr);
+			}
 		}
 		{
 			auto p = obs_properties_add_list(prs, P_FFMPEG_STANDARDCOMPLIANCE,
@@ -341,17 +345,6 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 AVCodec* encoder::generic_factory::get_avcodec()
 {
 	return this->avcodec_ptr;
-}
-
-bool encoder::generic_factory::modified_ratecontrol_properties(void*, obs_properties_t* props, obs_property_t*,
-                                                               obs_data_t* settings)
-{
-	keyframe_type kft = static_cast<keyframe_type>(obs_data_get_int(settings, P_RATECONTROL_KEYFRAME_TYPE));
-	obs_property_set_visible(obs_properties_get(props, P_RATECONTROL_KEYFRAME_INTERVAL ".Seconds"),
-	                         kft == keyframe_type::Seconds);
-	obs_property_set_visible(obs_properties_get(props, P_RATECONTROL_KEYFRAME_INTERVAL ".Frames"),
-	                         kft == keyframe_type::Frames);
-	return true;
 }
 
 encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
@@ -379,10 +372,10 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 	    static_cast<int>(obs_data_get_int(settings, P_FFMPEG_STANDARDCOMPLIANCE));
 	this->context->debug = 0;
 	/// Threading
-	if (this->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
-		this->context->thread_type = FF_THREAD_SLICE;
-	} else if (this->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+	if (this->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
 		this->context->thread_type = FF_THREAD_FRAME;
+	} else if (this->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+		this->context->thread_type = FF_THREAD_SLICE;
 	} else {
 		this->context->thread_type = 0;
 	}
@@ -428,23 +421,24 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 			this->context->pix_fmt = target;
 			this->swscale.set_source_format(source);
 			this->swscale.set_target_format(this->context->pix_fmt);
+
+			PLOG_INFO("Automatically detected target format '%s' for source format '%s'.",
+			          ffmpeg::tools::get_pixel_format_name(target),
+			          ffmpeg::tools::get_pixel_format_name(source));
+		}
+		if (obs_data_get_int(settings, P_FFMPEG_COLORFORMAT) != AV_PIX_FMT_NONE) {
+			// User specified override for color format.
+			this->context->pix_fmt =
+			    static_cast<AVPixelFormat>(obs_data_get_int(settings, P_FFMPEG_COLORFORMAT));
+			this->swscale.set_target_format(this->context->pix_fmt);
+			PLOG_INFO("User specified target format override '%s'.",
+			          ffmpeg::tools::get_pixel_format_name(this->context->pix_fmt));
 		}
 
 		// Framerate
 		this->context->time_base.num   = voi->fps_num;
 		this->context->time_base.den   = voi->fps_den;
 		this->context->ticks_per_frame = 1;
-
-		/// Group of Pictures
-		if (static_cast<keyframe_type>(obs_data_get_int(settings, P_RATECONTROL_KEYFRAME_TYPE))
-		    == keyframe_type::Frames) {
-			this->context->gop_size =
-			    static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_KEYFRAME_INTERVAL ".Frames"));
-		} else {
-			double_t real_gop = obs_data_get_double(settings, P_RATECONTROL_KEYFRAME_INTERVAL ".Seconds");
-			this->context->gop_size = static_cast<int>(real_gop * voi->fps_num / voi->fps_den);
-		}
-
 	} else if (this->codec->type == AVMEDIA_TYPE_AUDIO) {
 	}
 
@@ -475,7 +469,7 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 		// Create Frame queue
 		this->frame_queue.set_pixel_format(this->context->pix_fmt);
 		this->frame_queue.set_resolution(this->context->width, this->context->height);
-		this->frame_queue.precache(std::thread::hardware_concurrency());
+		this->frame_queue.precache(std::thread::hardware_concurrency() / 4);
 	} else if (this->codec->type == AVMEDIA_TYPE_AUDIO) {
 	}
 
@@ -557,23 +551,6 @@ bool encoder::generic::get_extra_data(uint8_t** extra_data, size_t* size)
 
 bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
 {
-	// Try and receive packet early.
-	{
-		ScopeProfiler profile_inner("recieve_early");
-
-		int res = receive_packet(received_packet, packet);
-		switch (res) {
-		case 0:
-		case AVERROR(EAGAIN):
-		case AVERROR(EOF):
-			break;
-		default:
-			PLOG_ERROR("Failed to receive packet: %s (%ld).", ffmpeg::tools::get_error_description(res),
-			           res);
-			return false;
-		}
-	}
-
 	// Convert frame.
 	std::shared_ptr<AVFrame> vframe = frame_queue.pop(); // Retrieve an empty frame.
 	{
@@ -599,7 +576,11 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 		bool          recv_packet = false;
 		bool          should_lag  = (lag_in_frames - frame_count) <= 0;
 
-		while (!sent_frame || (should_lag && !recv_packet)) {
+		auto loop_begin = std::chrono::high_resolution_clock::now();
+		auto loop_end   = loop_begin + std::chrono::milliseconds(50);
+
+		while ((!sent_frame || (should_lag && !recv_packet))
+		       && !(std::chrono::high_resolution_clock::now() > loop_end)) {
 			if (!sent_frame) {
 				ScopeProfiler profile_inner("send");
 
@@ -608,7 +589,9 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 				int res = send_frame(vframe);
 				switch (res) {
 				case 0:
+					PLOG_DEBUG("Sent frame at PTS %lld.", frame->pts);
 					sent_frame = true;
+					frame_count++;
 					break;
 				case AVERROR(EAGAIN):
 					// This means we should call receive_packet again, but what do we do with that data?
@@ -617,6 +600,9 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 						PLOG_ERROR(
 						    "Skipped frame due to EAGAIN when a packet was already returned.");
 						sent_frame = true;
+						frame_count++;
+					} else {
+						PLOG_DEBUG("Received EAGAIN, but had no input packet yet");
 					}
 					break;
 				case AVERROR(EOF):
@@ -630,18 +616,25 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 				}
 			}
 
-			if (!*received_packet) {
+			if (!recv_packet) {
 				ScopeProfiler profile_inner("recieve");
 
 				int res = receive_packet(received_packet, packet);
 				switch (res) {
 				case 0:
+					PLOG_DEBUG("Received packet with PTS %lld.", this->current_packet->pts);
+					recv_packet = true;
+					break;
 				case AVERROR(EOF):
+					PLOG_ERROR("Received end of file.");
 					recv_packet = true;
 					break;
 				case AVERROR(EAGAIN):
 					if (sent_frame) {
+						PLOG_DEBUG("Not enough input frames yet.");
 						recv_packet = true;
+					} else {
+						PLOG_DEBUG("Not enough input frames, waiting on new frame.");
 					}
 					break;
 				default:
@@ -680,9 +673,7 @@ int encoder::generic::receive_packet(bool* received_packet, struct encoder_packe
 
 		{
 			std::shared_ptr<AVFrame> uframe = frame_queue_used.pop_only();
-			if (frame_queue.empty()) {
-				frame_queue.push(uframe);
-			}
+			frame_queue.push(uframe);
 		}
 	}
 	return res;
