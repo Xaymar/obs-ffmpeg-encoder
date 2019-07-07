@@ -287,44 +287,14 @@ const char* encoder::generic_factory::get_name()
 
 void encoder::generic_factory::get_defaults(obs_data_t* settings)
 {
-#ifdef GENERATE_OPTIONS
-	AVCodecContext* ctx = avcodec_alloc_context3(this->avcodec_ptr);
-	if (ctx->priv_data) {
-		const AVOption* opt = nullptr;
-		while ((opt = av_opt_next(ctx->priv_data, opt)) != nullptr) {
-			if (opt->type == AV_OPT_TYPE_CONST && opt->unit != nullptr) {
-				continue;
-			}
-
-			switch (opt->type) {
-			case AV_OPT_TYPE_BOOL:
-				obs_data_set_default_bool(settings, opt->name, !!opt->default_val.i64);
-				break;
-			case AV_OPT_TYPE_INT:
-			case AV_OPT_TYPE_INT64:
-			case AV_OPT_TYPE_UINT64:
-				obs_data_set_default_int(settings, opt->name, opt->default_val.i64);
-				break;
-			case AV_OPT_TYPE_FLOAT:
-			case AV_OPT_TYPE_DOUBLE:
-				obs_data_set_default_double(settings, opt->name, opt->default_val.dbl);
-				break;
-			case AV_OPT_TYPE_STRING:
-				obs_data_set_default_string(settings, opt->name, opt->default_val.str);
-				break;
-			}
+	{ // Handler
+		auto ptr = obsffmpeg::find_codec_handler(this->avcodec_ptr->name);
+		if (ptr) {
+			ptr->get_defaults(settings, this->avcodec_ptr, nullptr);
 		}
 	}
-#endif
 
 	{ // Integrated Options
-		// Rate Control
-		obs_data_set_default_int(settings, P_RATECONTROL_PROFILE, 0);
-		obs_data_set_default_int(settings, P_RATECONTROL_BITRATE, 2500);
-		obs_data_set_default_int(settings, P_RATECONTROL_KEYFRAME_TYPE, 0);
-		obs_data_set_default_double(settings, P_RATECONTROL_KEYFRAME_INTERVAL ".Seconds", 2.0);
-		obs_data_set_default_int(settings, P_RATECONTROL_KEYFRAME_INTERVAL ".Frames", 300);
-
 		// FFmpeg
 		obs_data_set_default_string(settings, P_FFMPEG_CUSTOMSETTINGS, "");
 		obs_data_set_default_int(settings, P_FFMPEG_STANDARDCOMPLIANCE, FF_COMPLIANCE_STRICT);
@@ -333,158 +303,13 @@ void encoder::generic_factory::get_defaults(obs_data_t* settings)
 
 void encoder::generic_factory::get_properties(obs_properties_t* props)
 {
-#ifdef GENERATE_OPTIONS
-	// Encoder Options
-	AVCodecContext* ctx = avcodec_alloc_context3(this->avcodec_ptr);
-	if (ctx->priv_data) {
-		std::map<std::string, std::pair<obs_property_t*, const AVOption*>> unit_property_map;
-
-		const AVOption* opt = nullptr;
-		while ((opt = av_opt_next(ctx->priv_data, opt)) != nullptr) {
-			obs_property_t* p = nullptr;
-
-			// Constants are parts of a unit, not actual options.
-			if (opt->type == AV_OPT_TYPE_CONST) {
-				auto unit = unit_property_map.find(opt->unit);
-				if (unit == unit_property_map.end()) {
-					continue;
-				}
-
-				switch (unit->second.second->type) {
-				case AV_OPT_TYPE_INT:
-				case AV_OPT_TYPE_INT64:
-					obs_property_list_add_int(unit->second.first, opt->name, opt->default_val.i64);
-					break;
-				case AV_OPT_TYPE_FLOAT:
-				case AV_OPT_TYPE_DOUBLE:
-					obs_property_list_add_float(unit->second.first, opt->name,
-					                            opt->default_val.dbl);
-					break;
-				case AV_OPT_TYPE_STRING:
-					obs_property_list_add_string(unit->second.first, opt->name,
-					                             opt->default_val.str);
-					break;
-				default:
-					throw std::runtime_error("unhandled const type");
-				}
-
-				continue;
-			}
-
-			switch (opt->type) {
-			case AV_OPT_TYPE_BOOL:
-				p = obs_properties_add_bool(props, opt->name, opt->name);
-				break;
-			case AV_OPT_TYPE_INT:
-			case AV_OPT_TYPE_INT64:
-			case AV_OPT_TYPE_UINT64:
-				if (opt->unit != nullptr) {
-					p = obs_properties_add_list(props, opt->name, opt->name, OBS_COMBO_TYPE_LIST,
-					                            OBS_COMBO_FORMAT_INT);
-					unit_property_map.emplace(opt->unit,
-					                          std::pair<obs_property_t*, const AVOption*>{p, opt});
-				} else {
-					p = obs_properties_add_int(props, opt->name, opt->name,
-					                           static_cast<int>(opt->min),
-					                           static_cast<int>(opt->max), 1);
-				}
-				break;
-			case AV_OPT_TYPE_FLOAT:
-			case AV_OPT_TYPE_DOUBLE:
-				if (opt->unit != nullptr) {
-					p = obs_properties_add_list(props, opt->name, opt->name, OBS_COMBO_TYPE_LIST,
-					                            OBS_COMBO_FORMAT_FLOAT);
-					unit_property_map.emplace(opt->unit,
-					                          std::pair<obs_property_t*, const AVOption*>{p, opt});
-				} else {
-					p = obs_properties_add_float(props, opt->name, opt->name, opt->min, opt->max,
-					                             0.01);
-				}
-				break;
-			case AV_OPT_TYPE_STRING:
-				if (opt->unit != nullptr) {
-					p = obs_properties_add_list(props, opt->name, opt->name, OBS_COMBO_TYPE_LIST,
-					                            OBS_COMBO_FORMAT_STRING);
-					unit_property_map.emplace(opt->unit,
-					                          std::pair<obs_property_t*, const AVOption*>{p, opt});
-				} else {
-					p = obs_properties_add_text(props, opt->name, opt->name,
-					                            obs_text_type::OBS_TEXT_DEFAULT);
-				}
-				break;
-			case AV_OPT_TYPE_FLAGS:
-			case AV_OPT_TYPE_RATIONAL:
-			case AV_OPT_TYPE_VIDEO_RATE:
-			case AV_OPT_TYPE_BINARY:
-			case AV_OPT_TYPE_DICT:
-			case AV_OPT_TYPE_IMAGE_SIZE:
-			case AV_OPT_TYPE_PIXEL_FMT:
-			case AV_OPT_TYPE_SAMPLE_FMT:
-			case AV_OPT_TYPE_DURATION:
-			case AV_OPT_TYPE_COLOR:
-			case AV_OPT_TYPE_CHANNEL_LAYOUT:
-				PLOG_WARNING("Skipped option '%s' for codec '%s' as option type is not supported.",
-				             opt->name, this->info.uid.c_str());
-				break;
-			}
-
-			if ((opt->flags & AV_OPT_FLAG_READONLY) && (p != nullptr)) {
-				obs_property_set_enabled(p, false);
-			}
+	{ // Handler
+		auto ptr = obsffmpeg::find_codec_handler(this->avcodec_ptr->name);
+		if (ptr) {
+			ptr->get_properties(props, this->avcodec_ptr, nullptr);
 		}
 	}
-	avcodec_free_context(&ctx);
-#endif
 
-	// FFmpeg Options
-	{ /// Rate Control
-		auto prs = obs_properties_create();
-		{
-			auto grp = obs_properties_create();
-			auto p1  = obs_properties_add_list(grp, P_RATECONTROL_KEYFRAME_TYPE,
-                                                          TRANSLATE(P_RATECONTROL_KEYFRAME_TYPE), OBS_COMBO_TYPE_LIST,
-                                                          OBS_COMBO_FORMAT_INT);
-			obs_property_set_long_description(p1, TRANSLATE(DESC(P_RATECONTROL_KEYFRAME_TYPE)));
-			obs_property_set_modified_callback2(p1, modified_ratecontrol_properties, this);
-			obs_property_list_add_int(p1, TRANSLATE(P_RATECONTROL_KEYFRAME_TYPE ".Seconds"),
-			                          static_cast<int64_t>(keyframe_type::Seconds));
-			obs_property_list_add_int(p1, TRANSLATE(P_RATECONTROL_KEYFRAME_TYPE ".Frames"),
-			                          static_cast<int64_t>(keyframe_type::Frames));
-
-			auto p2 = obs_properties_add_float(grp, P_RATECONTROL_KEYFRAME_INTERVAL ".Seconds",
-			                                   TRANSLATE(P_RATECONTROL_KEYFRAME_INTERVAL), 0.0,
-			                                   std::numeric_limits<double_t>::max(), 0.01);
-			obs_property_set_long_description(p2, TRANSLATE(DESC(P_RATECONTROL_KEYFRAME_INTERVAL)));
-
-			auto p3 = obs_properties_add_int(grp, P_RATECONTROL_KEYFRAME_INTERVAL ".Frames",
-			                                 TRANSLATE(P_RATECONTROL_KEYFRAME_INTERVAL), 0,
-			                                 std::numeric_limits<int32_t>::max(), 1);
-			obs_property_set_long_description(p3, TRANSLATE(DESC(P_RATECONTROL_KEYFRAME_INTERVAL)));
-			auto gp = obs_properties_add_group(prs, P_RATECONTROL_KEYFRAME,
-			                                   TRANSLATE(P_RATECONTROL_KEYFRAME), OBS_GROUP_NORMAL, grp);
-
-			obs_property_set_visible(gp, !(this->avcodec_ptr->capabilities & AV_CODEC_CAP_INTRA_ONLY));
-		}
-		{
-			auto p = obs_properties_add_int(prs, P_RATECONTROL_BITRATE, TRANSLATE(P_RATECONTROL_BITRATE), 1,
-			                                std::numeric_limits<int32_t>::max(), 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(P_RATECONTROL_BITRATE)));
-		}
-		{
-			auto p = obs_properties_add_list(prs, P_RATECONTROL_PROFILE, TRANSLATE(P_RATECONTROL_PROFILE),
-			                                 OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-			if (this->avcodec_ptr->profiles) {
-				auto profile = this->avcodec_ptr->profiles;
-				obs_property_list_add_int(p, TRANSLATE(P_RATECONTROL_PROFILE ".None"),
-				                          FF_PROFILE_UNKNOWN);
-				while (profile->profile != FF_PROFILE_UNKNOWN) {
-					obs_property_list_add_int(p, profile->name, profile->profile);
-					profile++;
-				}
-			}
-		}
-		obs_properties_add_group(props, P_RATECONTROL, TRANSLATE(P_RATECONTROL), OBS_GROUP_NORMAL, prs);
-	};
 	{
 		auto prs = obs_properties_create();
 		{
@@ -535,7 +360,7 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 	this->factory = reinterpret_cast<generic_factory*>(obs_encoder_get_type_data(self));
 
 	// Verify that the codec actually still exists.
-	this->codec = avcodec_find_encoder(this->factory->get_avcodec()->id);
+	this->codec = avcodec_find_encoder_by_name(this->factory->get_avcodec()->name);
 	if (!this->codec) {
 		PLOG_ERROR("Failed to find encoder for codec '%s'.", this->factory->get_avcodec()->name);
 		throw std::runtime_error("failed to find codec");
@@ -674,51 +499,30 @@ encoder::generic::~generic()
 	}
 }
 
-void encoder::generic::get_properties(obs_properties_t*) {}
+void encoder::generic::get_properties(obs_properties_t* props)
+{
+	{ // Handler
+		auto ptr = obsffmpeg::find_codec_handler(this->codec->name);
+		if (ptr) {
+			ptr->get_properties(props, this->codec, this->context);
+		}
+	}
+}
 
 bool encoder::generic::update(obs_data_t* settings)
 {
-#ifdef GENERATE_OPTIONS
-	// Apply UI options.
-	if (this->context->priv_data) {
-		const AVOption* opt = nullptr;
-		while ((opt = av_opt_next(this->context->priv_data, opt)) != nullptr) {
-			if (opt->type == AV_OPT_TYPE_CONST && opt->unit != nullptr) {
-				continue;
-			}
-
-			switch (opt->type) {
-			case AV_OPT_TYPE_BOOL:
-				av_opt_set_int(this->context->priv_data, opt->name,
-				               obs_data_get_bool(settings, opt->name) ? 1 : 0, 0);
-				break;
-			case AV_OPT_TYPE_INT:
-			case AV_OPT_TYPE_INT64:
-			case AV_OPT_TYPE_UINT64:
-				av_opt_set_int(this->context->priv_data, opt->name,
-				               obs_data_get_int(settings, opt->name), 0);
-				break;
-			case AV_OPT_TYPE_FLOAT:
-			case AV_OPT_TYPE_DOUBLE:
-				av_opt_set_double(this->context->priv_data, opt->name,
-				                  obs_data_get_double(settings, opt->name), 0);
-				break;
-			case AV_OPT_TYPE_STRING:
-				av_opt_set(this->context->priv_data, opt->name,
-				           obs_data_get_string(settings, opt->name), 0);
-				break;
-			}
+	{ // Handler
+		auto ptr = obsffmpeg::find_codec_handler(this->codec->name);
+		if (ptr) {
+			ptr->update(settings, this->codec, this->context);
 		}
 	}
-#endif
 
-	// Apply default options
-	this->context->profile  = static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_PROFILE));
-	this->context->bit_rate = static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_BITRATE));
-
-	// Apply custom options.
-	av_opt_set_from_string(this->context, obs_data_get_string(settings, P_FFMPEG_CUSTOMSETTINGS), nullptr, ";",
-	                       "=");
+	{ // FFmpeg
+		// Apply custom options.
+		av_opt_set_from_string(this->context, obs_data_get_string(settings, P_FFMPEG_CUSTOMSETTINGS), nullptr,
+		                       ";", "=");
+	}
 	return false;
 }
 
