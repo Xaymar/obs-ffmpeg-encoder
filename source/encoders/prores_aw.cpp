@@ -33,7 +33,7 @@ extern "C" {
 #include <util/profiler.hpp>
 
 #define T_PROFILE "ProRes.Profile"
-#define T_PROFILE_(x) "ProRes.Profile." vstr(x)
+#define T_PROFILE_(x) "ProRes.Profile." D_VSTR(x)
 #define T_CUSTOM "Custom"
 
 #define LOG_PREFIX "[prores_aw] "

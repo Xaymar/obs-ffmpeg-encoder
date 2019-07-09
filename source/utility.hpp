@@ -40,8 +40,8 @@
 #define DESC(x) x ".Description"
 
 // Other
-#define vstr(s) dstr(s)
-#define dstr(s) #s
+#define D_STR(s) #s
+#define D_VSTR(s) D_STR(s)
 
 // Initializer
 #ifdef __cplusplus
