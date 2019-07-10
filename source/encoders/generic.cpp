@@ -292,7 +292,7 @@ void encoder::generic_factory::get_defaults(obs_data_t* settings)
 	{ // Integrated Options
 		// FFmpeg
 		obs_data_set_default_string(settings, P_FFMPEG_CUSTOMSETTINGS, "");
-		obs_data_set_default_int(settings, P_FFMPEG_COLORFORMAT, AV_PIX_FMT_NONE);
+		obs_data_set_default_int(settings, P_FFMPEG_COLORFORMAT, static_cast<int64_t>(AV_PIX_FMT_NONE));
 		obs_data_set_default_int(settings, P_FFMPEG_THREADS, 0);
 		obs_data_set_default_int(settings, P_FFMPEG_STANDARDCOMPLIANCE, FF_COMPLIANCE_STRICT);
 	}
@@ -319,9 +319,10 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 			auto p = obs_properties_add_list(prs, P_FFMPEG_COLORFORMAT, TRANSLATE(P_FFMPEG_COLORFORMAT),
 			                                 OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_COLORFORMAT)));
-			obs_property_list_add_int(p, TRANSLATE(P_AUTOMATIC), AV_PIX_FMT_NONE);
+			obs_property_list_add_int(p, TRANSLATE(P_AUTOMATIC), static_cast<int64_t>(AV_PIX_FMT_NONE));
 			for (auto ptr = this->avcodec_ptr->pix_fmts; *ptr != AV_PIX_FMT_NONE; ptr++) {
-				obs_property_list_add_int(p, ffmpeg::tools::get_pixel_format_name(*ptr), *ptr);
+				obs_property_list_add_int(p, ffmpeg::tools::get_pixel_format_name(*ptr),
+				                          static_cast<int64_t>(*ptr));
 			}
 		}
 		{
@@ -439,10 +440,11 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 			          ffmpeg::tools::get_pixel_format_name(target),
 			          ffmpeg::tools::get_pixel_format_name(source));
 		}
-		if (obs_data_get_int(settings, P_FFMPEG_COLORFORMAT) != AV_PIX_FMT_NONE) {
+		AVPixelFormat color_format_override =
+		    static_cast<AVPixelFormat>(obs_data_get_int(settings, P_FFMPEG_COLORFORMAT));
+		if (color_format_override != AV_PIX_FMT_NONE) {
 			// User specified override for color format.
-			this->context->pix_fmt =
-			    static_cast<AVPixelFormat>(obs_data_get_int(settings, P_FFMPEG_COLORFORMAT));
+			this->context->pix_fmt = color_format_override;
 			this->swscale.set_target_format(this->context->pix_fmt);
 			PLOG_INFO("User specified target format override '%s'.",
 			          ffmpeg::tools::get_pixel_format_name(this->context->pix_fmt));
