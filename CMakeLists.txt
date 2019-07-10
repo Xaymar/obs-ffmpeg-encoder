@@ -280,6 +280,8 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/ui/debug_handler.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ui/prores_aw_handler.hpp"
 	"${PROJECT_SOURCE_DIR}/source/ui/prores_aw_handler.cpp"
+	"${PROJECT_SOURCE_DIR}/source/ui/libvpx_vp9_handler.hpp"
+	"${PROJECT_SOURCE_DIR}/source/ui/libvpx_vp9_handler.cpp"
 )
 
 # Source Grouping

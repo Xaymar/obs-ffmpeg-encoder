@@ -17,11 +17,3 @@
 
 #pragma once
 #include "utility.hpp"
-
-#define P_RATECONTROL "RateControl"
-#define P_RATECONTROL_METHOD "RateControl.Method"
-#define P_RATECONTROL_METHOD_(x) "RateControl.Method." D_VSTR(x)
-#define P_RATECONTROL_BITRATE_TARGET "RateControl.Bitrate.Target"
-#define P_RATECONTROL_BITRATE_MINIMUM "RateControl.Bitrate.Minimum"
-#define P_RATECONTROL_BITRATE_MAXIMUM "RateControl.Bitrate.Maximum"
-#define P_RATECONTROL_BUFFERSIZE "RateControl.BufferSize"
