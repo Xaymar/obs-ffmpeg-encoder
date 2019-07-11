@@ -20,7 +20,7 @@
 #include "version.hpp"
 
 // Logging
-#define PLOG(level, ...) blog(level, "["##PROJECT_NAME##"] " __VA_ARGS__);
+#define PLOG(level, ...) blog(level, "[obs-ffmpeg-encoder] " __VA_ARGS__);
 #define PLOG_ERROR(...) PLOG(LOG_ERROR, __VA_ARGS__)
 #define PLOG_WARNING(...) PLOG(LOG_WARNING, __VA_ARGS__)
 #define PLOG_INFO(...) PLOG(LOG_INFO, __VA_ARGS__)
