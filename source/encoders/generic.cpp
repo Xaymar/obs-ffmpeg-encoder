@@ -380,10 +380,10 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 	    static_cast<int>(obs_data_get_int(settings, P_FFMPEG_STANDARDCOMPLIANCE));
 	this->context->debug = 0;
 	/// Threading
-	if (this->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
-		this->context->thread_type = FF_THREAD_FRAME;
-	} else if (this->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+	if (this->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
 		this->context->thread_type = FF_THREAD_SLICE;
+	} else if (this->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+		this->context->thread_type = FF_THREAD_FRAME;
 	} else {
 		this->context->thread_type = 0;
 	}
@@ -392,13 +392,8 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 		this->context->thread_count = static_cast<int>(threads);
 		this->lag_in_frames         = this->context->thread_count;
 	} else {
-		if (this->codec->capabilities & AV_CODEC_CAP_AUTO_THREADS) {
-			this->context->thread_count = 0;
-			this->lag_in_frames         = std::thread::hardware_concurrency();
-		} else {
-			this->context->thread_count = std::thread::hardware_concurrency();
-			this->lag_in_frames         = this->context->thread_count;
-		}
+		this->context->thread_count = std::thread::hardware_concurrency();
+		this->lag_in_frames         = this->context->thread_count;
 	}
 
 	// Video and Audio exclusive setup
