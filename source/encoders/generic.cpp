@@ -528,8 +528,8 @@ bool encoder::generic::update(obs_data_t* settings)
 
 	{ // FFmpeg
 		// Apply custom options.
-		av_opt_set_from_string(this->context, obs_data_get_string(settings, P_FFMPEG_CUSTOMSETTINGS), nullptr,
-		                       ";", "=");
+		av_opt_set_from_string(this->context->priv_data, obs_data_get_string(settings, P_FFMPEG_CUSTOMSETTINGS),
+		                       nullptr, "=", ";");
 	}
 	return false;
 }
