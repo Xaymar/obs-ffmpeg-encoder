@@ -454,8 +454,8 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 		}
 
 		// Framerate
-		this->context->time_base.num   = voi->fps_num;
-		this->context->time_base.den   = voi->fps_den;
+		this->context->time_base.num   = voi->fps_den;
+		this->context->time_base.den   = voi->fps_num;
 		this->context->ticks_per_frame = 1;
 	} else if (this->codec->type == AVMEDIA_TYPE_AUDIO) {
 	}
