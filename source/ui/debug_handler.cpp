@@ -66,8 +66,10 @@ void obsffmpeg::ui::debug_handler::get_properties(obs_properties_t* props, AVCod
 		return;
 
 	AVCodecContext* ctx = avcodec_alloc_context3(codec);
-	if (!ctx->priv_data)
+	if (!ctx->priv_data) {
+		avcodec_free_context(&ctx);
 		return;
+	}
 
 	PLOG_INFO("Options for '%s':", codec->name);
 
