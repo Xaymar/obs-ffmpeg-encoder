@@ -264,6 +264,8 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/utility.cpp"
 	"${PROJECT_SOURCE_DIR}/source/utility.hpp"
 	"${PROJECT_SOURCE_DIR}/source/strings.hpp"
+	"${PROJECT_SOURCE_DIR}/source/codecs/hevc.hpp"
+	"${PROJECT_SOURCE_DIR}/source/codecs/hevc.cpp"
 	"${PROJECT_SOURCE_DIR}/source/encoders/generic.hpp"
 	"${PROJECT_SOURCE_DIR}/source/encoders/generic.cpp"
 	"${PROJECT_SOURCE_DIR}/source/encoders/prores_aw.hpp"
