@@ -65,11 +65,11 @@ void encoder::generic_factory::register_encoder()
 	// TODO: Figure out a way to translate from names to other names.
 	{
 		std::stringstream sstr;
-		sstr << "[FFmpeg] " << (avcodec_ptr->long_name ? avcodec_ptr->long_name : avcodec_ptr->name) << " ("
+		sstr << (avcodec_ptr->long_name ? avcodec_ptr->long_name : avcodec_ptr->name) << " ("
 		     << avcodec_ptr->name << ")";
 		std::string caps = ffmpeg::tools::translate_encoder_capabilities(avcodec_ptr->capabilities);
 		if (caps.length() != 0) {
-			sstr << " (" << caps << ")";
+			sstr << " [" << caps << "]";
 		}
 		this->info.readable_name = sstr.str();
 	}
