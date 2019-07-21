@@ -39,8 +39,8 @@ namespace obsffmpeg {
 			protected:
 			obs_encoder_t* self = nullptr;
 
-			AVCodec*        avcodec = nullptr;
-			AVCodecContext* avcontext = nullptr;
+			AVCodec*        avcodec      = nullptr;
+			AVCodecContext* avcontext    = nullptr;
 			AVDictionary*   avdictionary = nullptr;
 			ffmpeg::swscale swscale;
 
@@ -124,7 +124,7 @@ namespace obsffmpeg {
 	{ \
 		_source##_info.id             = "obs-ffmpeg-encoder-" #_source; \
 		_source##_info.type           = OBS_ENCODER_VIDEO; \
-		_source##_info.caps           = 0; \
+		_source##_info.caps           = OBS_ENCODER_CAP_DEPRECATED; \
 		_source##_info.codec          = _codec; \
 		_source##_info.create         = _source##_create; \
 		_source##_info.destroy        = _source##_destroy; \
