@@ -28,9 +28,10 @@ extern "C" {
 #include <obs-module.h>
 #pragma warning(push)
 #pragma warning(disable : 4244)
-#include "libavutil/dict.h"
-#include "libavutil/frame.h"
-#include "libavutil/opt.h"
+#include <libavutil/dict.h>
+#include <libavutil/frame.h>
+#include <libavutil/opt.h>
+#include <libavutil/pixdesc.h>
 #pragma warning(pop)
 }
 
@@ -84,6 +85,13 @@ void encoder::generic_factory::register_encoder()
 	}
 	this->info.oei.id    = this->info.uid.c_str();
 	this->info.oei.codec = this->info.codec.c_str();
+
+	// Is this a deprecated encoder?
+#ifndef _DEBUG
+	if (!obsffmpeg::has_codec_handler(avcodec_ptr->name)) {
+		this->info.oei.caps |= OBS_ENCODER_CAP_DEPRECATED;
+	}
+#endif
 
 	// Detect encoder type (only Video and Audio supported)
 	if (avcodec_ptr->type == AVMediaType::AVMEDIA_TYPE_VIDEO) {
@@ -271,8 +279,8 @@ void encoder::generic_factory::register_encoder()
 	this->info.oei.type_data = this;
 
 	obs_register_encoder(&this->info.oei);
-	PLOG_INFO("Registered encoder #%llX with name '%s' and long name '%s' and caps %llX", avcodec_ptr,
-	          avcodec_ptr->name, avcodec_ptr->long_name, avcodec_ptr->capabilities);
+	PLOG_DEBUG("Registered encoder #%llX with name '%s' and long name '%s' and caps %llX", avcodec_ptr,
+	           avcodec_ptr->name, avcodec_ptr->long_name, avcodec_ptr->capabilities);
 }
 
 const char* encoder::generic_factory::get_name()
