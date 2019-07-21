@@ -22,10 +22,11 @@
 #define P_STATE_DISABLED "State.Disabled"
 #define P_STATE_ENABLED "State.Enabled"
 #define P_STATE_AUTOMATIC "State.Automatic"
+#define P_STATE_MANUAL "State.Manual"
 
 #define P_RATECONTROL "RateControl"
-#define P_RATECONTROL_METHOD "RateControl.Method"
-#define P_RATECONTROL_METHOD_(x) "RateControl.Method." D_VSTR(x)
+#define P_RATECONTROL_MODE "RateControl.Mode"
+#define P_RATECONTROL_MODE_(x) "RateControl.Mode." D_VSTR(x)
 #define P_RATECONTROL_BITRATE_TARGET "RateControl.Bitrate.Target"
 #define P_RATECONTROL_BITRATE_MINIMUM "RateControl.Bitrate.Minimum"
 #define P_RATECONTROL_BITRATE_MAXIMUM "RateControl.Bitrate.Maximum"
