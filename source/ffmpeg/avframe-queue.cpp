@@ -105,7 +105,8 @@ std::shared_ptr<AVFrame> ffmpeg::avframe_queue::pop()
 				ret = create_frame();
 			} else {
 				frames.pop_front();
-				if ((ret->width != this->resolution.first) || (ret->height != this->resolution.second)
+				if ((static_cast<uint32_t>(ret->width) != this->resolution.first)
+				    || (static_cast<uint32_t>(ret->height) != this->resolution.second)
 				    || (ret->format != this->format)) {
 					ret = nullptr;
 				}
