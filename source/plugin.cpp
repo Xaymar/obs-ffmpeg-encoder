@@ -54,6 +54,12 @@ std::shared_ptr<obsffmpeg::ui::handler> obsffmpeg::find_codec_handler(std::strin
 	return found->second;
 }
 
+bool obsffmpeg::has_codec_handler(std::string codec)
+{
+	auto found = codec_to_handler_map.find(codec);
+	return (found != codec_to_handler_map.end());
+}
+
 static std::map<AVCodec*, std::shared_ptr<encoder::generic_factory>> generic_factories;
 
 MODULE_EXPORT bool obs_module_load(void)

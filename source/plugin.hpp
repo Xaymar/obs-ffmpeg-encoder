@@ -31,6 +31,8 @@ namespace obsffmpeg {
 
 	std::shared_ptr<obsffmpeg::ui::handler> find_codec_handler(std::string codec);
 
+	bool has_codec_handler(std::string codec);
+
 } // namespace obsffmpeg
 
 MODULE_EXPORT bool obs_module_load(void);
