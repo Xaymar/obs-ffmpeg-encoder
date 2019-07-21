@@ -56,22 +56,11 @@ namespace obsffmpeg {
 				UNKNOWN = -1,
 			};
 
-			std::map<profile, std::string> profiles{
-			    {profile::MAIN, "main"},
-			    {profile::MAIN10, "main10"},
-			    {profile::RANGE_EXTENDED, "rext"},
-			};
+			extern std::map<profile, std::string> profiles;
 
-			std::map<tier, std::string> profile_tiers{
-			    {tier::MAIN, "main"},
-			    {tier::HIGH, "high"},
-			};
+			extern std::map<tier, std::string> profile_tiers;
 
-			std::map<level, std::string> levels{
-			    {level::L1_0, "1.0"}, {level::L2_0, "2.0"}, {level::L3_0, "3.0"}, {level::L3_1, "3.1"},
-			    {level::L4_0, "4.0"}, {level::L4_1, "4.1"}, {level::L5_0, "5.0"}, {level::L5_1, "5.1"},
-			    {level::L5_2, "5.2"}, {level::L6_0, "6.0"}, {level::L6_1, "6.1"}, {level::L6_2, "6.2"},
-			};
+			extern std::map<level, std::string> levels;
 
 		} // namespace hevc
 	}         // namespace codecs
