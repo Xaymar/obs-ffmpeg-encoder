@@ -36,12 +36,12 @@ std::string ffmpeg::tools::translate_encoder_capabilities(int capabilities)
 
 	    // Quality
 	    {AV_CODEC_CAP_LOSSLESS, "Lossless"},
-	    {AV_CODEC_CAP_INTRA_ONLY, "I-Frames only"},
+	    //{AV_CODEC_CAP_INTRA_ONLY, "I-Frames only"},
 
 	    // Threading
-	    {AV_CODEC_CAP_FRAME_THREADS, "Frame-Threading"},
-	    {AV_CODEC_CAP_SLICE_THREADS, "Slice-Threading"},
-	    {AV_CODEC_CAP_AUTO_THREADS, "Automatic-Threading"},
+	    //{AV_CODEC_CAP_FRAME_THREADS, "Frame-Threading"},
+	    //{AV_CODEC_CAP_SLICE_THREADS, "Slice-Threading"},
+	    //{AV_CODEC_CAP_AUTO_THREADS, "Automatic-Threading"},
 
 	    // Features
 	    {AV_CODEC_CAP_PARAM_CHANGE, "Dynamic Parameter Change"},
@@ -49,7 +49,7 @@ std::string ffmpeg::tools::translate_encoder_capabilities(int capabilities)
 	    {AV_CODEC_CAP_VARIABLE_FRAME_SIZE, "Variable Frame Size"},
 	    {AV_CODEC_CAP_SMALL_LAST_FRAME, "Small Final Frame"},
 	    //{AV_CODEC_CAP_DR1, "Uses get_buffer"},
-	    {AV_CODEC_CAP_DELAY, "Requires Flush"},
+	    //{AV_CODEC_CAP_DELAY, "Requires Flush"},
 
 	    // Other
 	    {AV_CODEC_CAP_TRUNCATED, "Truncated"},
