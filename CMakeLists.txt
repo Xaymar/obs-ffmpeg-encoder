@@ -284,6 +284,8 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/ui/prores_aw_handler.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ui/nvenc_shared.hpp"
 	"${PROJECT_SOURCE_DIR}/source/ui/nvenc_shared.cpp"
+	"${PROJECT_SOURCE_DIR}/source/ui/nvenc_hevc_handler.hpp"
+	"${PROJECT_SOURCE_DIR}/source/ui/nvenc_hevc_handler.cpp"
 )
 
 # Source Grouping
