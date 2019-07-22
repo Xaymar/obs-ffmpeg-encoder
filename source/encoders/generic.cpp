@@ -316,15 +316,20 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 	}
 
 	{
-		auto prs = obs_properties_create();
+		obs_properties_t* grp = props;
+		if (!obsffmpeg::are_property_groups_broken()) {
+			auto prs = obs_properties_create();
+			obs_properties_add_group(props, P_FFMPEG, TRANSLATE(P_FFMPEG), OBS_GROUP_NORMAL, prs);
+		}
+
 		{
 			auto p =
-			    obs_properties_add_text(prs, P_FFMPEG_CUSTOMSETTINGS, TRANSLATE(P_FFMPEG_CUSTOMSETTINGS),
+			    obs_properties_add_text(grp, P_FFMPEG_CUSTOMSETTINGS, TRANSLATE(P_FFMPEG_CUSTOMSETTINGS),
 			                            obs_text_type::OBS_TEXT_DEFAULT);
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_CUSTOMSETTINGS)));
 		}
 		if (this->avcodec_ptr->pix_fmts) {
-			auto p = obs_properties_add_list(prs, P_FFMPEG_COLORFORMAT, TRANSLATE(P_FFMPEG_COLORFORMAT),
+			auto p = obs_properties_add_list(grp, P_FFMPEG_COLORFORMAT, TRANSLATE(P_FFMPEG_COLORFORMAT),
 			                                 OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_COLORFORMAT)));
 			obs_property_list_add_int(p, TRANSLATE(P_AUTOMATIC), static_cast<int64_t>(AV_PIX_FMT_NONE));
@@ -333,13 +338,13 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 				                          static_cast<int64_t>(*ptr));
 			}
 		}
-		{
-			auto p = obs_properties_add_int_slider(prs, P_FFMPEG_THREADS, TRANSLATE(P_FFMPEG_THREADS), 0,
+		if (this->avcodec_ptr->capabilities & (AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_SLICE_THREADS)) {
+			auto p = obs_properties_add_int_slider(grp, P_FFMPEG_THREADS, TRANSLATE(P_FFMPEG_THREADS), 0,
 			                                       std::thread::hardware_concurrency() * 2, 1);
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_THREADS)));
 		}
 		{
-			auto p = obs_properties_add_list(prs, P_FFMPEG_STANDARDCOMPLIANCE,
+			auto p = obs_properties_add_list(grp, P_FFMPEG_STANDARDCOMPLIANCE,
 			                                 TRANSLATE(P_FFMPEG_STANDARDCOMPLIANCE), OBS_COMBO_TYPE_LIST,
 			                                 OBS_COMBO_FORMAT_INT);
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_STANDARDCOMPLIANCE)));
@@ -354,7 +359,6 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 			obs_property_list_add_int(p, TRANSLATE(P_FFMPEG_STANDARDCOMPLIANCE ".Experimental"),
 			                          FF_COMPLIANCE_EXPERIMENTAL);
 		}
-		obs_properties_add_group(props, P_FFMPEG, TRANSLATE(P_FFMPEG), OBS_GROUP_NORMAL, prs);
 	};
 }
 
@@ -388,20 +392,22 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 	    static_cast<int>(obs_data_get_int(settings, P_FFMPEG_STANDARDCOMPLIANCE));
 	this->context->debug = 0;
 	/// Threading
-	if (this->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
-		this->context->thread_type = FF_THREAD_SLICE;
-	} else if (this->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
-		this->context->thread_type = FF_THREAD_FRAME;
-	} else {
-		this->context->thread_type = 0;
-	}
-	int64_t threads = obs_data_get_int(settings, P_FFMPEG_THREADS);
-	if (threads > 0) {
-		this->context->thread_count = static_cast<int>(threads);
-		this->lag_in_frames         = this->context->thread_count;
-	} else {
-		this->context->thread_count = std::thread::hardware_concurrency();
-		this->lag_in_frames         = this->context->thread_count;
+	if (this->codec->capabilities
+	    & (AV_CODEC_CAP_AUTO_THREADS | AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_SLICE_THREADS)) {
+		if (this->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+			this->context->thread_type |= FF_THREAD_FRAME;
+		}
+		if (this->codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+			this->context->thread_type |= FF_THREAD_SLICE;
+		}
+		int64_t threads = obs_data_get_int(settings, P_FFMPEG_THREADS);
+		if (threads > 0) {
+			this->context->thread_count = static_cast<int>(threads);
+			this->lag_in_frames         = this->context->thread_count;
+		} else {
+			this->context->thread_count = std::thread::hardware_concurrency();
+			this->lag_in_frames         = this->context->thread_count;
+		}
 	}
 
 	// Video and Audio exclusive setup
