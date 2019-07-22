@@ -442,8 +442,51 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 			AVPixelFormat source = ffmpeg::tools::obs_videoformat_to_avpixelformat(voi->format);
 			AVPixelFormat target = AV_PIX_FMT_NONE;
 
-			int loss = 0;
-			target   = avcodec_find_best_pix_fmt_of_list(this->codec->pix_fmts, source, false, &loss);
+			// Prefer lossless or zero-change formats.
+			for (auto ptr = this->codec->pix_fmts; *ptr != AV_PIX_FMT_NONE; ptr++) {
+				switch (source) {
+				case AV_PIX_FMT_RGBA:
+					switch (*ptr) {
+					case AV_PIX_FMT_RGB0:
+					case AV_PIX_FMT_RGBA:
+						target = *ptr;
+						break;
+					case AV_PIX_FMT_BGR0:
+					case AV_PIX_FMT_BGRA:
+						target = *ptr;
+						break;
+					}
+					break;
+				case AV_PIX_FMT_BGRA:
+				case AV_PIX_FMT_BGR0:
+					switch (*ptr) {
+					case AV_PIX_FMT_RGB0:
+					case AV_PIX_FMT_RGBA:
+						target = *ptr;
+						break;
+					case AV_PIX_FMT_BGR0:
+					case AV_PIX_FMT_BGRA:
+						target = *ptr;
+						break;
+					}
+					break;
+				case AV_PIX_FMT_YUV444P:
+				case AV_PIX_FMT_YUYV422:
+				case AV_PIX_FMT_YVYU422:
+				case AV_PIX_FMT_UYVY422:
+				case AV_PIX_FMT_YUV420P:
+				case AV_PIX_FMT_NV12:
+					if (*ptr == source) {
+						target = *ptr;
+					}
+					break;
+				}
+			}
+
+			if (target == AV_PIX_FMT_NONE) {
+				int loss = 0;
+				target = avcodec_find_best_pix_fmt_of_list(this->codec->pix_fmts, source, false, &loss);
+			}
 
 			this->context->pix_fmt = target;
 			this->swscale.set_source_format(source);
