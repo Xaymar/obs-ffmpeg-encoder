@@ -692,7 +692,7 @@ int encoder::generic::receive_packet(bool* received_packet, struct encoder_packe
 	if (res == 0) {
 		packet->type          = OBS_ENCODER_VIDEO;
 		packet->pts           = this->current_packet->pts;
-		packet->dts           = this->current_packet->pts;
+		packet->dts           = this->current_packet->dts;
 		packet->data          = this->current_packet->data;
 		packet->size          = this->current_packet->size;
 		packet->keyframe      = !!(this->current_packet->flags & AV_PKT_FLAG_KEY);
