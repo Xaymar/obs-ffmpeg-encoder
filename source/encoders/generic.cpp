@@ -544,16 +544,14 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 	} else if (this->codec->type == AVMEDIA_TYPE_AUDIO) {
 	}
 
-	// Create Packet
-	this->current_packet = av_packet_alloc();
-	if (!this->current_packet) {
-		PLOG_ERROR("Failed to allocate packet storage.");
-		throw std::runtime_error("Failed to allocate packet storage.");
-	}
+	av_init_packet(&this->current_packet);
+	av_new_packet(&this->current_packet, 8 * 1024 * 1024); // 8 MB precached Packet size.
 }
 
 encoder::generic::~generic()
 {
+	av_packet_unref(&this->current_packet);
+
 	this->frame_queue.clear();
 	this->frame_queue_used.clear();
 	this->swscale.finalize();
@@ -786,15 +784,14 @@ bool encoder::generic::video_encode_texture(uint32_t, int64_t, uint64_t, uint64_
 
 int encoder::generic::receive_packet(bool* received_packet, struct encoder_packet* packet)
 {
-	av_init_packet(this->current_packet);
-	int res = avcodec_receive_packet(this->context, this->current_packet);
+	int res = avcodec_receive_packet(this->context, &this->current_packet);
 	if (res == 0) {
 		packet->type          = OBS_ENCODER_VIDEO;
-		packet->pts           = this->current_packet->pts;
-		packet->dts           = this->current_packet->dts;
-		packet->data          = this->current_packet->data;
-		packet->size          = this->current_packet->size;
-		packet->keyframe      = !!(this->current_packet->flags & AV_PKT_FLAG_KEY);
+		packet->pts           = this->current_packet.pts;
+		packet->dts           = this->current_packet.dts;
+		packet->data          = this->current_packet.data;
+		packet->size          = this->current_packet.size;
+		packet->keyframe      = !!(this->current_packet.flags & AV_PKT_FLAG_KEY);
 		packet->drop_priority = 0;
 		*received_packet      = true;
 
@@ -803,6 +800,7 @@ int encoder::generic::receive_packet(bool* received_packet, struct encoder_packe
 			frame_queue.push(uframe);
 		}
 	}
+
 	return res;
 }
 

@@ -67,7 +67,7 @@ namespace encoder {
 		ffmpeg::avframe_queue frame_queue;
 		ffmpeg::avframe_queue frame_queue_used;
 		ffmpeg::swscale       swscale;
-		AVPacket*             current_packet = nullptr;
+		AVPacket              current_packet;
 
 		int64_t lag_in_frames;
 		int64_t frame_count;
