@@ -581,6 +581,36 @@ bool encoder::generic::get_extra_data(uint8_t** extra_data, size_t* size)
 	return true;
 }
 
+static inline void copy_data(encoder_frame* frame, AVFrame* vframe)
+{
+	int h_chroma_shift, v_chroma_shift;
+	av_pix_fmt_get_chroma_sub_sample(static_cast<AVPixelFormat>(vframe->format), &h_chroma_shift, &v_chroma_shift);
+
+	for (size_t idx = 0; (idx < MAX_AV_PLANES) && (idx < AV_NUM_DATA_POINTERS); idx++) {
+		if (!frame->data[idx] || !vframe->data[idx])
+			continue;
+
+		size_t plane_height = vframe->height >> (idx ? v_chroma_shift : 0);
+
+		if (static_cast<uint32_t>(vframe->linesize[idx]) == frame->linesize[idx]) {
+			std::memcpy(vframe->data[idx], frame->data[idx], frame->linesize[idx] * plane_height);
+		} else {
+			size_t ls_in  = frame->linesize[idx];
+			size_t ls_out = vframe->linesize[idx];
+			size_t bytes  = ls_in < ls_out ? ls_in : ls_out;
+
+			uint8_t* to   = vframe->data[idx];
+			uint8_t* from = frame->data[idx];
+
+			for (size_t y = 0; y < plane_height; y++) {
+				std::memcpy(to, from, bytes);
+				to += ls_out;
+				from += ls_in;
+			}
+		}
+	}
+}
+
 bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
 {
 	// Convert frame.
@@ -588,16 +618,24 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 	{
 		ScopeProfiler profile("convert");
 
+		vframe->height      = this->context->height;
+		vframe->format      = this->context->pix_fmt;
 		vframe->color_range = this->context->color_range;
 		vframe->colorspace  = this->context->colorspace;
 
-		int res =
-		    swscale.convert(reinterpret_cast<uint8_t**>(frame->data), reinterpret_cast<int*>(frame->linesize),
-		                    0, this->context->height, vframe->data, vframe->linesize);
-		if (res <= 0) {
-			PLOG_ERROR("Failed to convert frame: %s (%ld).", ffmpeg::tools::get_error_description(res),
-			           res);
-			return false;
+		if ((swscale.is_source_full_range() == swscale.is_target_full_range())
+		    && (swscale.get_source_colorspace() == swscale.get_target_colorspace())
+		    && (swscale.get_source_format() == swscale.get_target_format())) {
+			copy_data(frame, vframe.get());
+		} else {
+			int res = swscale.convert(reinterpret_cast<uint8_t**>(frame->data),
+			                          reinterpret_cast<int*>(frame->linesize), 0, this->context->height,
+			                          vframe->data, vframe->linesize);
+			if (res <= 0) {
+				PLOG_ERROR("Failed to convert frame: %s (%ld).",
+				           ffmpeg::tools::get_error_description(res), res);
+				return false;
+			}
 		}
 	}
 
