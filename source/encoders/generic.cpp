@@ -627,7 +627,7 @@ static inline void copy_data(encoder_frame* frame, AVFrame* vframe)
 	int h_chroma_shift, v_chroma_shift;
 	av_pix_fmt_get_chroma_sub_sample(static_cast<AVPixelFormat>(vframe->format), &h_chroma_shift, &v_chroma_shift);
 
-	for (size_t idx = 0; (idx < MAX_AV_PLANES) && (idx < AV_NUM_DATA_POINTERS); idx++) {
+	for (size_t idx = 0; idx < MAX_AV_PLANES; idx++) {
 		if (!frame->data[idx] || !vframe->data[idx])
 			continue;
 
