@@ -710,8 +710,7 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 				switch (res) {
 				case 0:
 					sent_frame = true;
-					frame_queue_used.push(vframe);
-					vframe = nullptr;
+					vframe     = nullptr;
 					break;
 				case AVERROR(EAGAIN):
 					// This means we should call receive_packet again, but what do we do with that data?
@@ -809,6 +808,7 @@ int encoder::generic::send_frame(std::shared_ptr<AVFrame> frame)
 	int res = avcodec_send_frame(this->context, frame.get());
 	switch (res) {
 	case 0:
+		frame_queue_used.push(frame);
 		frame_count++;
 	case AVERROR(EAGAIN):
 	case AVERROR(EOF):
