@@ -19,6 +19,11 @@
 
 #include "version.hpp"
 
+extern "C" {
+#include <obs-config.h>
+#include <obs.h>
+}
+
 // Logging
 #define PLOG(level, ...) blog(level, "[obs-ffmpeg-encoder] " __VA_ARGS__);
 #define PLOG_ERROR(...) PLOG(LOG_ERROR, __VA_ARGS__)
@@ -71,3 +76,11 @@
 	static void f(void) __attribute__((constructor)); \
 	static void f(void)
 #endif
+
+// Helpers
+namespace obsffmpeg {
+	bool inline are_property_groups_broken()
+	{
+		return obs_get_version() < MAKE_SEMANTIC_VERSION(24, 0, 0);
+	}
+} // namespace obsffmpeg
