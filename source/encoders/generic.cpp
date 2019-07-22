@@ -540,7 +540,7 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 		// Create Frame queue
 		this->frame_queue.set_pixel_format(this->context->pix_fmt);
 		this->frame_queue.set_resolution(this->context->width, this->context->height);
-		this->frame_queue.precache(std::thread::hardware_concurrency() / 4);
+		this->frame_queue.precache(2);
 	} else if (this->codec->type == AVMEDIA_TYPE_AUDIO) {
 	}
 
@@ -659,7 +659,9 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 	// Convert frame.
 	std::shared_ptr<AVFrame> vframe = frame_queue.pop(); // Retrieve an empty frame.
 	{
+#ifdef _DEBUG
 		ScopeProfiler profile("convert");
+#endif
 
 		vframe->height      = this->context->height;
 		vframe->format      = this->context->pix_fmt;
@@ -684,10 +686,12 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 
 	// Send and receive frames.
 	{
+#ifdef _DEBUG
 		ScopeProfiler profile("loop");
-		bool          sent_frame  = false;
-		bool          recv_packet = false;
-		bool          should_lag  = (lag_in_frames - frame_count) <= 0;
+#endif
+		bool sent_frame  = false;
+		bool recv_packet = false;
+		bool should_lag  = (lag_in_frames - frame_count) <= 0;
 
 		auto loop_begin = std::chrono::high_resolution_clock::now();
 		auto loop_end   = loop_begin + std::chrono::milliseconds(50);
@@ -697,7 +701,9 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 			bool eagain_is_stupid = false;
 
 			if (!sent_frame) {
+#ifdef _DEBUG
 				ScopeProfiler profile_inner("send");
+#endif
 
 				vframe->pts = frame->pts;
 
@@ -705,7 +711,8 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 				switch (res) {
 				case 0:
 					sent_frame = true;
-					frame_count++;
+					frame_queue_used.push(vframe);
+					vframe = nullptr;
 					break;
 				case AVERROR(EAGAIN):
 					// This means we should call receive_packet again, but what do we do with that data?
@@ -714,7 +721,6 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 						PLOG_WARNING(
 						    "Skipped frame due to EAGAIN when a packet was already returned.");
 						sent_frame = true;
-						frame_count++;
 					}
 					eagain_is_stupid = true;
 					break;
@@ -730,7 +736,9 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 			}
 
 			if (!recv_packet) {
+#ifdef _DEBUG
 				ScopeProfiler profile_inner("recieve");
+#endif
 
 				int res = receive_packet(received_packet, packet);
 				switch (res) {
@@ -761,6 +769,10 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 				std::this_thread::sleep_for(std::chrono::milliseconds(1));
 			}
 		}
+	}
+
+	if (vframe != nullptr) {
+		frame_queue.push(vframe);
 	}
 
 	return true;
