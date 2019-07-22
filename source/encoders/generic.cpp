@@ -689,6 +689,7 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 #ifdef _DEBUG
 		ScopeProfiler profile("loop");
 #endif
+
 		bool sent_frame  = false;
 		bool recv_packet = false;
 		bool should_lag  = (lag_in_frames - frame_count) <= 0;
@@ -785,6 +786,7 @@ bool encoder::generic::video_encode_texture(uint32_t, int64_t, uint64_t, uint64_
 
 int encoder::generic::receive_packet(bool* received_packet, struct encoder_packet* packet)
 {
+	av_init_packet(this->current_packet);
 	int res = avcodec_receive_packet(this->context, this->current_packet);
 	if (res == 0) {
 		packet->type          = OBS_ENCODER_VIDEO;
