@@ -106,8 +106,8 @@ std::map<ratecontrolmode, std::string> obsffmpeg::nvenc::ratecontrolmodes{
 };
 
 std::map<ratecontrolmode, std::string> obsffmpeg::nvenc::ratecontrolmode_to_opt{
-    {ratecontrolmode::CQP, "const_qp"}, {ratecontrolmode::VBR, "vbr"},       {ratecontrolmode::VBR_HQ, "vbr_hq"},
-    {ratecontrolmode::CBR, "cbr"},      {ratecontrolmode::CBR_HQ, "cbr_hq"}, {ratecontrolmode::CBR_LD_HQ, "cbr_ld_hq"},
+    {ratecontrolmode::CQP, "constqp"}, {ratecontrolmode::VBR, "vbr"},       {ratecontrolmode::VBR_HQ, "vbr_hq"},
+    {ratecontrolmode::CBR, "cbr"},     {ratecontrolmode::CBR_HQ, "cbr_hq"}, {ratecontrolmode::CBR_LD_HQ, "cbr_ld_hq"},
 };
 
 std::map<b_ref_mode, std::string> obsffmpeg::nvenc::b_ref_modes{
@@ -627,9 +627,8 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, AVCodec* codec, AVCodecConte
 	}
 
 	{ // AQ
-		bool saq  = obs_data_get_bool(settings, P_AQ_SPATIAL);
-		int  saqs = static_cast<int>(obs_data_get_int(settings, P_AQ_STRENGTH));
-		bool taq  = obs_data_get_bool(settings, P_AQ_TEMPORAL);
+		bool saq = obs_data_get_bool(settings, P_AQ_SPATIAL);
+		bool taq = obs_data_get_bool(settings, P_AQ_TEMPORAL);
 
 		if (strcmp(codec->name, "h264_nvenc")) {
 			av_opt_set_int(context->priv_data, "spatial-aq", saq ? 1 : 0, 0);
@@ -638,7 +637,10 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, AVCodec* codec, AVCodecConte
 			av_opt_set_int(context->priv_data, "spatial_aq", saq ? 1 : 0, 0);
 			av_opt_set_int(context->priv_data, "temporal_aq", taq ? 1 : 0, 0);
 		}
-		av_opt_set_int(context->priv_data, "aq-strength", saqs, 0);
+		if (saq) {
+			av_opt_set_int(context->priv_data, "aq-strength",
+			               static_cast<int>(obs_data_get_int(settings, P_AQ_STRENGTH)), 0);
+		}
 	}
 
 	{ // Other
