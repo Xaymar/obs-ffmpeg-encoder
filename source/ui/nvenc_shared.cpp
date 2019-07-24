@@ -154,10 +154,6 @@ void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, AVCodec*, AVCodecConte
 	obs_data_set_default_int(settings, P_RATECONTROL_QP_B, 21);
 	obs_data_set_default_int(settings, P_RATECONTROL_QP_B_INITIAL, -1);
 
-	obs_data_set_default_int(settings, G_KEYFRAMES_INTERVALTYPE, 0);
-	obs_data_set_default_double(settings, G_KEYFRAMES_INTERVAL_SECONDS, 2.0);
-	obs_data_set_default_int(settings, G_KEYFRAMES_INTERVAL_FRAMES, 300);
-
 	obs_data_set_default_bool(settings, P_AQ_SPATIAL, true);
 	obs_data_set_default_int(settings, P_AQ_STRENGTH, 8);
 	obs_data_set_default_bool(settings, P_AQ_TEMPORAL, true);
@@ -222,14 +218,6 @@ static bool modified_quality(obs_properties_t* props, obs_property_t*, obs_data_
 	bool enabled = obs_data_get_bool(settings, P_RATECONTROL_QUALITY);
 	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QUALITY_MINIMUM), enabled);
 	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QUALITY_MAXIMUM), enabled);
-	return true;
-}
-
-static bool modified_keyframes(obs_properties_t* props, obs_property_t*, obs_data_t* settings)
-{
-	bool is_seconds = obs_data_get_int(settings, G_KEYFRAMES_INTERVALTYPE) == 0;
-	obs_property_set_visible(obs_properties_get(props, G_KEYFRAMES_INTERVAL_FRAMES), !is_seconds);
-	obs_property_set_visible(obs_properties_get(props, G_KEYFRAMES_INTERVAL_SECONDS), is_seconds);
 	return true;
 }
 
@@ -399,38 +387,6 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, AVCodec* cod
 		obs_properties_t* grp = props;
 		if (!obsffmpeg::are_property_groups_broken()) {
 			grp = obs_properties_create();
-			obs_properties_add_group(props, G_KEYFRAMES, TRANSLATE(G_KEYFRAMES), OBS_GROUP_NORMAL, grp);
-		}
-
-		{
-			auto p =
-			    obs_properties_add_list(grp, G_KEYFRAMES_INTERVALTYPE, TRANSLATE(G_KEYFRAMES_INTERVALTYPE),
-			                            OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-			obs_property_set_long_description(p, TRANSLATE(DESC(G_KEYFRAMES_INTERVALTYPE)));
-			obs_property_set_modified_callback(p, modified_keyframes);
-			obs_property_list_add_int(p, TRANSLATE(G_KEYFRAMES_INTERVALTYPE_(Seconds)), 0);
-			obs_property_list_add_int(p, TRANSLATE(G_KEYFRAMES_INTERVALTYPE_(Frames)), 1);
-		}
-		{
-			auto p =
-			    obs_properties_add_float(grp, G_KEYFRAMES_INTERVAL_SECONDS, TRANSLATE(G_KEYFRAMES_INTERVAL),
-			                             0.00, std::numeric_limits<int16_t>::max(), 0.01);
-			obs_property_set_long_description(p, TRANSLATE(DESC(G_KEYFRAMES_INTERVAL)));
-			obs_property_float_set_suffix(p, " seconds");
-		}
-		{
-			auto p =
-			    obs_properties_add_int(grp, G_KEYFRAMES_INTERVAL_FRAMES, TRANSLATE(G_KEYFRAMES_INTERVAL), 0,
-			                           std::numeric_limits<int32_t>::max(), 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(G_KEYFRAMES_INTERVAL)));
-			obs_property_int_set_suffix(p, " frames");
-		}
-	}
-
-	{
-		obs_properties_t* grp = props;
-		if (!obsffmpeg::are_property_groups_broken()) {
-			grp = obs_properties_create();
 			obs_properties_add_group(props, P_AQ, TRANSLATE(P_AQ), OBS_GROUP_NORMAL, grp);
 		}
 
@@ -516,10 +472,6 @@ void obsffmpeg::nvenc::get_runtime_properties(obs_properties_t* props, AVCodec*,
 	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QP_P_INITIAL), false);
 	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QP_B), false);
 	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QP_B_INITIAL), false);
-	obs_property_set_enabled(obs_properties_get(props, G_KEYFRAMES), false);
-	obs_property_set_enabled(obs_properties_get(props, G_KEYFRAMES_INTERVALTYPE), false);
-	obs_property_set_enabled(obs_properties_get(props, G_KEYFRAMES_INTERVAL_SECONDS), false);
-	obs_property_set_enabled(obs_properties_get(props, G_KEYFRAMES_INTERVAL_FRAMES), false);
 	obs_property_set_enabled(obs_properties_get(props, P_AQ), false);
 	obs_property_set_enabled(obs_properties_get(props, P_AQ_SPATIAL), false);
 	obs_property_set_enabled(obs_properties_get(props, P_AQ_STRENGTH), false);
@@ -630,24 +582,6 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, AVCodec* codec, AVCodecConte
 			av_opt_set_int(context->priv_data, "init_qpB",
 			               obs_data_get_int(settings, P_RATECONTROL_QP_B_INITIAL), 0);
 		}
-	}
-
-	{ // Key Frames
-		obs_video_info ovi;
-		if (!obs_get_video_info(&ovi)) {
-			throw std::runtime_error("no video info");
-		}
-
-		int64_t kf_type    = obs_data_get_int(settings, G_KEYFRAMES_INTERVALTYPE);
-		bool    is_seconds = (kf_type == 0);
-
-		if (is_seconds) {
-			context->gop_size = static_cast<int>(obs_data_get_double(settings, G_KEYFRAMES_INTERVAL_SECONDS)
-			                                     * (ovi.fps_num / ovi.fps_den));
-		} else {
-			context->gop_size = static_cast<int>(obs_data_get_int(settings, G_KEYFRAMES_INTERVAL_FRAMES));
-		}
-		context->keyint_min = context->gop_size;
 	}
 
 	{ // AQ
