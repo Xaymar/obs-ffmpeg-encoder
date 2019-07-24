@@ -176,8 +176,8 @@ bool ffmpeg::swscale::initialize(int flags)
 	}
 
 	sws_setColorspaceDetails(this->context, sws_getCoefficients(source_colorspace), source_full_range ? 1 : 0,
-	                         sws_getCoefficients(target_colorspace), target_full_range ? 1 : 0, 1L << 16 | 0l,
-	                         1L << 16 | 0l, 1L << 16 | 0l);
+	                         sws_getCoefficients(target_colorspace), target_full_range ? 1 : 0, 1L << 16 | 0L,
+	                         1L << 16 | 0L, 1L << 16 | 0L);
 
 	return true;
 }
