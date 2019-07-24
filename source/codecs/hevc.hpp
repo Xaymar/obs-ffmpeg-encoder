@@ -47,6 +47,7 @@ namespace obsffmpeg {
 			enum class level {
 				L1_0    = 30,
 				L2_0    = 60,
+				L2_1    = 63,
 				L3_0    = 90,
 				L3_1    = 93,
 				L4_0    = 120,
@@ -59,13 +60,6 @@ namespace obsffmpeg {
 				L6_2    = 186,
 				UNKNOWN = -1,
 			};
-
-			extern std::map<profile, std::string> profiles;
-
-			extern std::map<tier, std::string> profile_tiers;
-
-			extern std::map<level, std::string> levels;
-
 		} // namespace hevc
 	}         // namespace codecs
 } // namespace obsffmpeg

@@ -56,6 +56,25 @@ Useless except for strict_gop maybe?
 [obs-ffmpeg-encoder]   Option 'bluray-compat' with help 'Bluray compatibility workarounds' of type 'Bool' with default value 'false', minimum '0.000000' and maximum '1.000000'.
 */
 
+using namespace obsffmpeg::codecs::hevc;
+
+std::map<profile, std::string> profiles{
+    {profile::MAIN, "main"},
+    {profile::MAIN10, "main10"},
+    {profile::RANGE_EXTENDED, "rext"},
+};
+
+std::map<tier, std::string> tiers{
+    {tier::MAIN, "main"},
+    {tier::HIGH, "high"},
+};
+
+std::map<level, std::string> levels{
+    {level::L1_0, "1.0"}, {level::L2_0, "2.0"}, {level::L2_1, "2.1"}, {level::L3_0, "3.0"}, {level::L3_1, "3.1"},
+    {level::L4_0, "4.0"}, {level::L4_1, "4.1"}, {level::L5_0, "5.0"}, {level::L5_1, "5.1"}, {level::L5_2, "5.2"},
+    {level::L6_0, "6.0"}, {level::L6_1, "6.1"}, {level::L6_2, "6.2"},
+};
+
 INITIALIZER(nvenc_hevc_handler_init)
 {
 	obsffmpeg::initializers.push_back([]() {
@@ -86,36 +105,23 @@ void obsffmpeg::ui::nvenc_hevc_handler::update(obs_data_t* settings, AVCodec* co
 	nvenc::update(settings, codec, context);
 
 	{ // HEVC Options
-		codecs::hevc::profile profile =
-		    static_cast<codecs::hevc::profile>(obs_data_get_int(settings, P_HEVC_PROFILE));
-		switch (profile) {
-		case codecs::hevc::profile::MAIN:
-		case codecs::hevc::profile::MAIN10:
-		case codecs::hevc::profile::RANGE_EXTENDED:
-			av_opt_set_int(context->priv_data, "profile", static_cast<int64_t>(profile), 0);
-			break;
-		default:
-			av_opt_set_int(context->priv_data, "profile", static_cast<int64_t>(codecs::hevc::profile::MAIN),
-			               0);
-			break;
+		auto found = profiles.find(static_cast<profile>(obs_data_get_int(settings, P_HEVC_PROFILE)));
+		if (found != profiles.end()) {
+			av_opt_set(context->priv_data, "profile", found->second.c_str(), 0);
 		}
-
-		codecs::hevc::tier tier = static_cast<codecs::hevc::tier>(obs_data_get_int(settings, P_HEVC_TIER));
-		switch (tier) {
-		case codecs::hevc::tier::MAIN:
-		case codecs::hevc::tier::HIGH:
-			av_opt_set_int(context->priv_data, "tier", static_cast<int64_t>(tier), 0);
-			break;
-		default:
-			av_opt_set_int(context->priv_data, "tier", static_cast<int64_t>(codecs::hevc::tier::MAIN), 0);
-			break;
+	}
+	{
+		auto found = tiers.find(static_cast<tier>(obs_data_get_int(settings, P_HEVC_TIER)));
+		if (found != tiers.end()) {
+			av_opt_set(context->priv_data, "tier", found->second.c_str(), 0);
 		}
-
-		codecs::hevc::level level = static_cast<codecs::hevc::level>(obs_data_get_int(settings, P_HEVC_LEVEL));
-		if (level != codecs::hevc::level::UNKNOWN) {
-			av_opt_set_int(context->priv_data, "level", static_cast<int64_t>(level), 0);
+	}
+	{
+		auto found = levels.find(static_cast<level>(obs_data_get_int(settings, P_HEVC_LEVEL)));
+		if (found != levels.end()) {
+			av_opt_set(context->priv_data, "level", found->second.c_str(), 0);
 		} else {
-			av_opt_set_int(context->priv_data, "level", static_cast<int64_t>(0), 0); // Automatic
+			av_opt_set(context->priv_data, "level", "auto", 0);
 		}
 	}
 }
@@ -137,7 +143,7 @@ void obsffmpeg::ui::nvenc_hevc_handler::get_encoder_properties(obs_properties_t*
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_HEVC_PROFILE)));
 			obs_property_list_add_int(p, TRANSLATE(G_STATE_DEFAULT),
 			                          static_cast<int64_t>(codecs::hevc::profile::UNKNOWN));
-			for (auto const kv : codecs::hevc::profiles) {
+			for (auto const kv : profiles) {
 				std::string trans = std::string(P_HEVC_PROFILE) + "." + kv.second;
 				obs_property_list_add_int(p, TRANSLATE(trans.c_str()), static_cast<int64_t>(kv.first));
 			}
@@ -148,7 +154,7 @@ void obsffmpeg::ui::nvenc_hevc_handler::get_encoder_properties(obs_properties_t*
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_HEVC_TIER)));
 			obs_property_list_add_int(p, TRANSLATE(G_STATE_DEFAULT),
 			                          static_cast<int64_t>(codecs::hevc::tier::UNKNOWN));
-			for (auto const kv : codecs::hevc::profile_tiers) {
+			for (auto const kv : tiers) {
 				std::string trans = std::string(P_HEVC_TIER) + "." + kv.second;
 				obs_property_list_add_int(p, TRANSLATE(trans.c_str()), static_cast<int64_t>(kv.first));
 			}
@@ -159,7 +165,7 @@ void obsffmpeg::ui::nvenc_hevc_handler::get_encoder_properties(obs_properties_t*
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_HEVC_LEVEL)));
 			obs_property_list_add_int(p, TRANSLATE(G_STATE_AUTOMATIC),
 			                          static_cast<int64_t>(codecs::hevc::level::UNKNOWN));
-			for (auto const kv : codecs::hevc::levels) {
+			for (auto const kv : levels) {
 				obs_property_list_add_int(p, kv.second.c_str(), static_cast<int64_t>(kv.first));
 			}
 		}
