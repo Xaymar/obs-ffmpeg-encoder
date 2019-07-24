@@ -194,6 +194,33 @@ AVPixelFormat ffmpeg::tools::obs_videoformat_to_avpixelformat(video_format v)
 	throw std::invalid_argument("unknown format");
 }
 
+video_format ffmpeg::tools::avpixelformat_to_obs_videoformat(AVPixelFormat v)
+{
+	switch (v) {
+	case AV_PIX_FMT_YUV420P:
+		return VIDEO_FORMAT_I420;
+	case AV_PIX_FMT_NV12:
+		return VIDEO_FORMAT_NV12;
+	case AV_PIX_FMT_YVYU422:
+		return VIDEO_FORMAT_YVYU;
+	case AV_PIX_FMT_YUYV422:
+		return VIDEO_FORMAT_YUY2;
+	case AV_PIX_FMT_UYVY422:
+		return VIDEO_FORMAT_UYVY;
+	case AV_PIX_FMT_RGBA:
+		return VIDEO_FORMAT_RGBA;
+	case AV_PIX_FMT_BGRA:
+		return VIDEO_FORMAT_BGRA;
+	case AV_PIX_FMT_BGR0:
+		return VIDEO_FORMAT_BGRX;
+	case AV_PIX_FMT_GRAY8:
+		return VIDEO_FORMAT_Y800;
+	case AV_PIX_FMT_YUV444P:
+		return VIDEO_FORMAT_I444;
+	}
+	return VIDEO_FORMAT_NONE;
+}
+
 AVColorSpace ffmpeg::tools::obs_videocolorspace_to_avcolorspace(video_colorspace v)
 {
 	switch (v) {

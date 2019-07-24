@@ -42,6 +42,8 @@ namespace ffmpeg {
 
 		AVPixelFormat obs_videoformat_to_avpixelformat(video_format v);
 
+		video_format avpixelformat_to_obs_videoformat(AVPixelFormat v);
+
 		AVColorSpace obs_videocolorspace_to_avcolorspace(video_colorspace v);
 
 		AVColorRange obs_videorangetype_to_avcolorrange(video_range_type v);
