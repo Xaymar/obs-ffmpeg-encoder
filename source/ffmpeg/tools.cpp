@@ -201,7 +201,7 @@ AVColorSpace ffmpeg::tools::obs_videocolorspace_to_avcolorspace(video_colorspace
 	case VIDEO_CS_709:
 		return AVCOL_SPC_BT709;
 	case VIDEO_CS_601:
-		return AVCOL_SPC_SMPTE170M;
+		return AVCOL_SPC_BT470BG;
 	}
 	throw std::invalid_argument("unknown color space");
 }
