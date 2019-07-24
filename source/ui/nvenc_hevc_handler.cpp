@@ -137,7 +137,7 @@ void obsffmpeg::ui::nvenc_hevc_handler::get_encoder_properties(obs_properties_t*
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_HEVC_PROFILE)));
 			obs_property_list_add_int(p, TRANSLATE(G_STATE_DEFAULT),
 			                          static_cast<int64_t>(codecs::hevc::profile::UNKNOWN));
-			for (auto kv : codecs::hevc::profiles) {
+			for (auto const kv : codecs::hevc::profiles) {
 				std::string trans = std::string(P_HEVC_PROFILE) + "." + kv.second;
 				obs_property_list_add_int(p, TRANSLATE(trans.c_str()), static_cast<int64_t>(kv.first));
 			}
@@ -148,7 +148,7 @@ void obsffmpeg::ui::nvenc_hevc_handler::get_encoder_properties(obs_properties_t*
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_HEVC_TIER)));
 			obs_property_list_add_int(p, TRANSLATE(G_STATE_DEFAULT),
 			                          static_cast<int64_t>(codecs::hevc::tier::UNKNOWN));
-			for (auto kv : codecs::hevc::profile_tiers) {
+			for (auto const kv : codecs::hevc::profile_tiers) {
 				std::string trans = std::string(P_HEVC_TIER) + "." + kv.second;
 				obs_property_list_add_int(p, TRANSLATE(trans.c_str()), static_cast<int64_t>(kv.first));
 			}
@@ -159,7 +159,7 @@ void obsffmpeg::ui::nvenc_hevc_handler::get_encoder_properties(obs_properties_t*
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_HEVC_LEVEL)));
 			obs_property_list_add_int(p, TRANSLATE(G_STATE_AUTOMATIC),
 			                          static_cast<int64_t>(codecs::hevc::level::UNKNOWN));
-			for (auto kv : codecs::hevc::levels) {
+			for (auto const kv : codecs::hevc::levels) {
 				obs_property_list_add_int(p, kv.second.c_str(), static_cast<int64_t>(kv.first));
 			}
 		}

@@ -135,7 +135,7 @@ void obsffmpeg::ui::nvenc_h264_handler::get_encoder_properties(obs_properties_t*
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_H264_PROFILE)));
 			obs_property_list_add_int(p, TRANSLATE(G_STATE_DEFAULT),
 			                          static_cast<int64_t>(codecs::h264::profile::UNKNOWN));
-			for (auto kv : profiles) {
+			for (auto const kv : profiles) {
 				std::string trans = std::string(P_H264_PROFILE) + "." + kv.second;
 				obs_property_list_add_int(p, TRANSLATE(trans.c_str()), static_cast<int64_t>(kv.first));
 			}
@@ -146,7 +146,7 @@ void obsffmpeg::ui::nvenc_h264_handler::get_encoder_properties(obs_properties_t*
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_H264_LEVEL)));
 			obs_property_list_add_int(p, TRANSLATE(G_STATE_AUTOMATIC),
 			                          static_cast<int64_t>(codecs::h264::level::UNKNOWN));
-			for (auto kv : levels) {
+			for (auto const kv : levels) {
 				obs_property_list_add_int(p, kv.second.c_str(), static_cast<int64_t>(kv.first));
 			}
 		}
