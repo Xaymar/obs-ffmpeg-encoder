@@ -29,7 +29,7 @@ install:
 - cmd: ci/appveyor-install.bat
 
 build_script:
-- cmd: node ci/appveyor-build.js
+- cmd: node ci/builder.js
 
 after_build:
 - cmd: ci/appveyor-package.bat
