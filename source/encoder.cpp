@@ -21,6 +21,7 @@
 
 #include "encoder.hpp"
 #include <iomanip>
+#include <map>
 #include <sstream>
 #include <thread>
 #include <util/profiler.hpp>
@@ -692,7 +693,155 @@ bool obsffmpeg::encoder::audio_encode(encoder_frame*, encoder_packet*, bool*)
 	return false;
 }
 
-void obsffmpeg::encoder::get_video_info(video_scale_info*) {}
+void obsffmpeg::encoder::get_video_info(video_scale_info* vsi)
+{
+	// Apply Video Format override.
+	{
+		obs_data_t*   settings  = obs_encoder_get_settings(this->self);
+		AVPixelFormat format_av = static_cast<AVPixelFormat>(obs_data_get_int(settings, P_FFMPEG_COLORFORMAT));
+		if (format_av != AV_PIX_FMT_NONE) {
+			video_format format_obs = ffmpeg::tools::avpixelformat_to_obs_videoformat(format_av);
+			if (format_obs != VIDEO_FORMAT_NONE) {
+				vsi->format = format_obs;
+				return;
+			}
+		}
+	}
+
+	// There was no override, make sure that we got a useful video format that requires no conversion.
+	std::map<video_format, bool> supported;
+	for (auto ptr = this->codec->pix_fmts; *ptr != AV_PIX_FMT_NONE; ptr++) {
+		switch (*ptr) {
+		case AV_PIX_FMT_RGBA:
+		case AV_PIX_FMT_RGB0:
+			supported.insert_or_assign(VIDEO_FORMAT_RGBA, true);
+			break;
+		case AV_PIX_FMT_BGRA:
+			supported.insert_or_assign(VIDEO_FORMAT_BGRA, true);
+			break;
+		case AV_PIX_FMT_BGR0:
+			supported.insert_or_assign(VIDEO_FORMAT_BGRX, true);
+			break;
+		case AV_PIX_FMT_YUV420P:
+			supported.insert_or_assign(VIDEO_FORMAT_I420, true);
+			break;
+		case AV_PIX_FMT_NV12:
+			supported.insert_or_assign(VIDEO_FORMAT_NV12, true);
+			break;
+		case AV_PIX_FMT_YVYU422:
+			supported.insert_or_assign(VIDEO_FORMAT_YVYU, true);
+			break;
+		case AV_PIX_FMT_UYVY422:
+			supported.insert_or_assign(VIDEO_FORMAT_UYVY, true);
+			break;
+		case AV_PIX_FMT_YUYV422:
+			supported.insert_or_assign(VIDEO_FORMAT_YUY2, true);
+			break;
+		case AV_PIX_FMT_YUV444P:
+			supported.insert_or_assign(VIDEO_FORMAT_I444, true);
+			break;
+		case AV_PIX_FMT_GRAY8:
+			supported.insert_or_assign(VIDEO_FORMAT_Y800, true);
+			break;
+		case AV_PIX_FMT_BGR24:
+			supported.insert_or_assign(VIDEO_FORMAT_BGR3, true);
+			break;
+		}
+	}
+
+	// If the video format we target is supported, don't change anything.
+	if (supported.count(vsi->format) > 0) {
+		return;
+	}
+
+	// If not, find the next best video format.
+	// This is not the best code to do this, but if it works, it's better than nothing.
+	std::vector<video_format> best_quality;
+	if (vsi->format == VIDEO_FORMAT_NV12) {
+		// 4:2:0
+		best_quality = {
+		    VIDEO_FORMAT_NV12, VIDEO_FORMAT_I420, VIDEO_FORMAT_YVYU, VIDEO_FORMAT_YUY2,
+		    VIDEO_FORMAT_UYVY, VIDEO_FORMAT_RGBA, VIDEO_FORMAT_BGRA, VIDEO_FORMAT_BGRX,
+		    VIDEO_FORMAT_BGR3, VIDEO_FORMAT_I444, VIDEO_FORMAT_Y800,
+		};
+	} else if (vsi->format == VIDEO_FORMAT_I420) {
+		// 4:2:0
+		best_quality = {
+		    VIDEO_FORMAT_I420, VIDEO_FORMAT_NV12, VIDEO_FORMAT_YVYU, VIDEO_FORMAT_YUY2,
+		    VIDEO_FORMAT_UYVY, VIDEO_FORMAT_RGBA, VIDEO_FORMAT_BGRA, VIDEO_FORMAT_BGRX,
+		    VIDEO_FORMAT_BGR3, VIDEO_FORMAT_I444, VIDEO_FORMAT_Y800,
+		};
+	} else if (vsi->format == VIDEO_FORMAT_YVYU) {
+		// 4:2:2
+		best_quality = {
+		    VIDEO_FORMAT_YVYU, VIDEO_FORMAT_YUY2, VIDEO_FORMAT_UYVY, VIDEO_FORMAT_RGBA,
+		    VIDEO_FORMAT_BGRA, VIDEO_FORMAT_BGRX, VIDEO_FORMAT_BGR3, VIDEO_FORMAT_I444,
+		    VIDEO_FORMAT_NV12, VIDEO_FORMAT_I420, VIDEO_FORMAT_Y800,
+		};
+	} else if (vsi->format == VIDEO_FORMAT_YUY2) {
+		// 4:2:2
+		best_quality = {
+		    VIDEO_FORMAT_YUY2, VIDEO_FORMAT_YVYU, VIDEO_FORMAT_UYVY, VIDEO_FORMAT_RGBA,
+		    VIDEO_FORMAT_BGRA, VIDEO_FORMAT_BGRX, VIDEO_FORMAT_BGR3, VIDEO_FORMAT_I444,
+		    VIDEO_FORMAT_NV12, VIDEO_FORMAT_I420, VIDEO_FORMAT_Y800,
+		};
+	} else if (vsi->format == VIDEO_FORMAT_UYVY) {
+		// 4:2:2
+		best_quality = {
+		    VIDEO_FORMAT_UYVY, VIDEO_FORMAT_YVYU, VIDEO_FORMAT_YUY2, VIDEO_FORMAT_RGBA,
+		    VIDEO_FORMAT_BGRA, VIDEO_FORMAT_BGRX, VIDEO_FORMAT_BGR3, VIDEO_FORMAT_I444,
+		    VIDEO_FORMAT_NV12, VIDEO_FORMAT_I420, VIDEO_FORMAT_Y800,
+		};
+	} else if (vsi->format == VIDEO_FORMAT_I444) {
+		// 4:4:4
+		best_quality = {
+		    VIDEO_FORMAT_I444, VIDEO_FORMAT_RGBA, VIDEO_FORMAT_BGRA, VIDEO_FORMAT_BGRX,
+		    VIDEO_FORMAT_BGR3, VIDEO_FORMAT_UYVY, VIDEO_FORMAT_YVYU, VIDEO_FORMAT_YUY2,
+		    VIDEO_FORMAT_NV12, VIDEO_FORMAT_I420, VIDEO_FORMAT_Y800,
+		};
+	} else if (vsi->format == VIDEO_FORMAT_RGBA) {
+		// Packed Non-Planar
+		best_quality = {
+		    VIDEO_FORMAT_RGBA, VIDEO_FORMAT_BGRA, VIDEO_FORMAT_BGRX, VIDEO_FORMAT_BGR3,
+		    VIDEO_FORMAT_UYVY, VIDEO_FORMAT_YVYU, VIDEO_FORMAT_YUY2, VIDEO_FORMAT_I444,
+		    VIDEO_FORMAT_NV12, VIDEO_FORMAT_I420, VIDEO_FORMAT_Y800,
+		};
+	} else if (vsi->format == VIDEO_FORMAT_BGRA) {
+		// Packed Non-Planar
+		best_quality = {
+		    VIDEO_FORMAT_BGRA, VIDEO_FORMAT_RGBA, VIDEO_FORMAT_BGRX, VIDEO_FORMAT_BGR3,
+		    VIDEO_FORMAT_UYVY, VIDEO_FORMAT_YVYU, VIDEO_FORMAT_YUY2, VIDEO_FORMAT_I444,
+		    VIDEO_FORMAT_NV12, VIDEO_FORMAT_I420, VIDEO_FORMAT_Y800,
+		};
+	} else if (vsi->format == VIDEO_FORMAT_BGRX) {
+		// Packed Non-Planar
+		best_quality = {
+		    VIDEO_FORMAT_BGRX, VIDEO_FORMAT_RGBA, VIDEO_FORMAT_BGRA, VIDEO_FORMAT_BGR3,
+		    VIDEO_FORMAT_UYVY, VIDEO_FORMAT_YVYU, VIDEO_FORMAT_YUY2, VIDEO_FORMAT_I444,
+		    VIDEO_FORMAT_NV12, VIDEO_FORMAT_I420, VIDEO_FORMAT_Y800,
+		};
+	} else if (vsi->format == VIDEO_FORMAT_BGR3) {
+		// Packed Non-Planar
+		best_quality = {
+		    VIDEO_FORMAT_BGR3, VIDEO_FORMAT_RGBA, VIDEO_FORMAT_BGRA, VIDEO_FORMAT_BGRX,
+		    VIDEO_FORMAT_UYVY, VIDEO_FORMAT_YVYU, VIDEO_FORMAT_YUY2, VIDEO_FORMAT_I444,
+		    VIDEO_FORMAT_NV12, VIDEO_FORMAT_I420, VIDEO_FORMAT_Y800,
+		};
+	} else if (vsi->format == VIDEO_FORMAT_Y800) {
+		// Packed Non-Planar
+		best_quality = {
+		    VIDEO_FORMAT_Y800, VIDEO_FORMAT_RGBA, VIDEO_FORMAT_BGRA, VIDEO_FORMAT_BGRX,
+		    VIDEO_FORMAT_UYVY, VIDEO_FORMAT_YVYU, VIDEO_FORMAT_YUY2, VIDEO_FORMAT_I444,
+		    VIDEO_FORMAT_BGR3, VIDEO_FORMAT_NV12, VIDEO_FORMAT_I420,
+		};
+	}
+	for (auto v : best_quality) {
+		if (supported.count(v) > 0) {
+			vsi->format = v;
+			return;
+		}
+	}
+}
 
 bool obsffmpeg::encoder::get_sei_data(uint8_t**, size_t*)
 {
