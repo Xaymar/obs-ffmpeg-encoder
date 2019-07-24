@@ -610,6 +610,14 @@ obsffmpeg::encoder::~encoder()
 	this->swscale.finalize();
 
 	if (this->context) {
+		// Flush encoders that require it.
+		if ((this->codec->capabilities & AV_CODEC_CAP_DELAY) != 0) {
+			avcodec_send_frame(this->context, nullptr);
+			while (avcodec_receive_packet(this->context, &this->current_packet) != AVERROR(EOF)) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			}
+		}
+
 		avcodec_close(this->context);
 		avcodec_free_context(&this->context);
 	}
