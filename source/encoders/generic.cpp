@@ -803,7 +803,7 @@ int encoder::generic::receive_packet(bool* received_packet, struct encoder_packe
 	return res;
 }
 
-int encoder::generic::send_frame(std::shared_ptr<AVFrame> frame)
+int encoder::generic::send_frame(std::shared_ptr<AVFrame> const frame)
 {
 	int res = avcodec_send_frame(this->context, frame.get());
 	switch (res) {

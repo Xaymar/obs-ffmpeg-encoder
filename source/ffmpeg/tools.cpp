@@ -64,7 +64,7 @@ std::string ffmpeg::tools::translate_encoder_capabilities(int capabilities)
 	};
 
 	std::stringstream sstr;
-	for (auto kv : caps) {
+	for (auto const kv : caps) {
 		if (capabilities & kv.first) {
 			capabilities &= ~kv.first;
 			sstr << kv.second;

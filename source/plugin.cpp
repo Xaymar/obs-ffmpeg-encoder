@@ -45,12 +45,12 @@ std::list<std::function<void()>> obsffmpeg::finalizers;
 static std::map<std::string, std::shared_ptr<obsffmpeg::ui::handler>> codec_to_handler_map;
 static std::shared_ptr<obsffmpeg::ui::handler> debug_handler = std::make_shared<obsffmpeg::ui::debug_handler>();
 
-void obsffmpeg::register_codec_handler(std::string codec, std::shared_ptr<obsffmpeg::ui::handler> handler)
+void obsffmpeg::register_codec_handler(std::string const codec, std::shared_ptr<obsffmpeg::ui::handler> const handler)
 {
 	codec_to_handler_map.emplace(codec, handler);
 }
 
-std::shared_ptr<obsffmpeg::ui::handler> obsffmpeg::find_codec_handler(std::string codec)
+std::shared_ptr<obsffmpeg::ui::handler> obsffmpeg::find_codec_handler(std::string const codec)
 {
 	auto found = codec_to_handler_map.find(codec);
 	if (found == codec_to_handler_map.end())
@@ -58,7 +58,7 @@ std::shared_ptr<obsffmpeg::ui::handler> obsffmpeg::find_codec_handler(std::strin
 	return found->second;
 }
 
-bool obsffmpeg::has_codec_handler(std::string codec)
+bool obsffmpeg::has_codec_handler(std::string const codec)
 {
 	auto found = codec_to_handler_map.find(codec);
 	return (found != codec_to_handler_map.end());
@@ -72,7 +72,7 @@ try {
 	avcodec_register_all();
 
 	// Run all initializers.
-	for (auto func : obsffmpeg::initializers) {
+	for (auto const func : obsffmpeg::initializers) {
 		func();
 	}
 
@@ -91,7 +91,7 @@ try {
 
 	obsffmpeg::encoder::prores_aw::initialize();
 	return true;
-} catch (std::exception ex) {
+} catch (std::exception const& ex) {
 	PLOG_ERROR("Exception during initalization: %s.", ex.what());
 	return false;
 } catch (...) {
@@ -104,10 +104,10 @@ try {
 	obsffmpeg::encoder::prores_aw::finalize();
 
 	// Run all finalizers.
-	for (auto func : obsffmpeg::finalizers) {
+	for (auto const func : obsffmpeg::finalizers) {
 		func();
 	}
-} catch (std::exception ex) {
+} catch (std::exception const& ex) {
 	PLOG_ERROR("Exception during finalizing: %s.", ex.what());
 } catch (...) {
 	PLOG_ERROR("Unrecognized exception during finalizing.");

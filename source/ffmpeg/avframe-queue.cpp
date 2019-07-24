@@ -45,7 +45,7 @@ ffmpeg::avframe_queue::~avframe_queue()
 	clear();
 }
 
-void ffmpeg::avframe_queue::set_resolution(uint32_t width, uint32_t height)
+void ffmpeg::avframe_queue::set_resolution(uint32_t const width, uint32_t const height)
 {
 	this->resolution.first  = width;
 	this->resolution.second = height;
@@ -67,7 +67,7 @@ uint32_t ffmpeg::avframe_queue::get_height()
 	return this->resolution.second;
 }
 
-void ffmpeg::avframe_queue::set_pixel_format(AVPixelFormat format)
+void ffmpeg::avframe_queue::set_pixel_format(AVPixelFormat const format)
 {
 	this->format = format;
 }
@@ -90,7 +90,7 @@ void ffmpeg::avframe_queue::clear()
 	frames.clear();
 }
 
-void ffmpeg::avframe_queue::push(std::shared_ptr<AVFrame> frame)
+void ffmpeg::avframe_queue::push(std::shared_ptr<AVFrame> const frame)
 {
 	std::unique_lock<std::mutex> ulock(this->lock);
 	frames.push_back(frame);
