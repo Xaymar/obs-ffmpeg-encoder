@@ -21,11 +21,11 @@
 
 #include "plugin.hpp"
 #include <memory>
-#include "encoders/generic.hpp"
-#include "encoders/prores_aw.hpp"
+#include "encoder.hpp"
 #include "ui/debug_handler.hpp"
 #include "ui/handler.hpp"
 #include "utility.hpp"
+#include <map>
 
 extern "C" {
 #include <obs-module.h>
@@ -64,7 +64,7 @@ bool obsffmpeg::has_codec_handler(std::string const codec)
 	return (found != codec_to_handler_map.end());
 }
 
-static std::map<AVCodec*, std::shared_ptr<encoder::generic_factory>> generic_factories;
+static std::map<AVCodec*, std::shared_ptr<obsffmpeg::encoder_factory>> generic_factories;
 
 MODULE_EXPORT bool obs_module_load(void)
 try {
@@ -83,15 +83,14 @@ try {
 			continue;
 
 		if ((cdc->type == AVMediaType::AVMEDIA_TYPE_AUDIO) || (cdc->type == AVMediaType::AVMEDIA_TYPE_VIDEO)) {
-			auto ptr = std::make_shared<encoder::generic_factory>(cdc);
+			auto ptr = std::make_shared<obsffmpeg::encoder_factory>(cdc);
 			ptr->register_encoder();
 			generic_factories.emplace(cdc, ptr);
 		}
 	}
 
-	obsffmpeg::encoder::prores_aw::initialize();
 	return true;
-} catch (std::exception const& ex) {
+} catch (std::exception& ex) {
 	PLOG_ERROR("Exception during initalization: %s.", ex.what());
 	return false;
 } catch (...) {
@@ -101,13 +100,12 @@ try {
 
 MODULE_EXPORT void obs_module_unload(void)
 try {
-	obsffmpeg::encoder::prores_aw::finalize();
 
 	// Run all finalizers.
 	for (auto const func : obsffmpeg::finalizers) {
 		func();
 	}
-} catch (std::exception const& ex) {
+} catch (std::exception& ex) {
 	PLOG_ERROR("Exception during finalizing: %s.", ex.what());
 } catch (...) {
 	PLOG_ERROR("Unrecognized exception during finalizing.");

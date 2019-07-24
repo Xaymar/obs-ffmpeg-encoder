@@ -261,8 +261,8 @@ set(PROJECT_GENERATED
 	"${PROJECT_BINARY_DIR}/source/version.hpp"
 )
 set(PROJECT_PRIVATE
-	"${PROJECT_SOURCE_DIR}/source/generic.hpp"
-	"${PROJECT_SOURCE_DIR}/source/generic.cpp"
+	"${PROJECT_SOURCE_DIR}/source/encoder.hpp"
+	"${PROJECT_SOURCE_DIR}/source/encoder.cpp"
 	"${PROJECT_SOURCE_DIR}/source/plugin.cpp"
 	"${PROJECT_SOURCE_DIR}/source/plugin.hpp"
 	"${PROJECT_SOURCE_DIR}/source/utility.cpp"

@@ -22,14 +22,23 @@
 #pragma once
 
 #include <condition_variable>
-#include <encoder.hpp>
 #include <mutex>
 #include <thread>
 #include "ffmpeg/avframe-queue.hpp"
 #include "ffmpeg/swscale.hpp"
 
-namespace encoder {
-	class generic_factory {
+extern "C" {
+#include <obs.h>
+#include <obs-properties.h>
+#pragma warning(push)
+#pragma warning(disable : 4244)
+#include <libavcodec/avcodec.h>
+#include <libavutil/frame.h>
+#pragma warning(pop)
+}
+
+namespace obsffmpeg {
+	class encoder_factory {
 		struct info {
 			std::string      uid;
 			std::string      codec;
@@ -39,8 +48,8 @@ namespace encoder {
 		AVCodec* avcodec_ptr;
 
 		public:
-		generic_factory(AVCodec* codec);
-		virtual ~generic_factory();
+		encoder_factory(AVCodec* codec);
+		virtual ~encoder_factory();
 
 		void register_encoder();
 
@@ -57,9 +66,9 @@ namespace encoder {
 		                                            obs_data_t* settings);
 	};
 
-	class generic {
+	class encoder {
 		obs_encoder_t*   self;
-		generic_factory* factory;
+		encoder_factory* factory;
 
 		AVCodec*        codec;
 		AVCodecContext* context;
@@ -73,8 +82,8 @@ namespace encoder {
 		int64_t frame_count;
 
 		public:
-		generic(obs_data_t* settings, obs_encoder_t* encoder);
-		virtual ~generic();
+		encoder(obs_data_t* settings, obs_encoder_t* encoder);
+		virtual ~encoder();
 
 		public: // OBS API
 		// Shared
@@ -105,4 +114,4 @@ namespace encoder {
 
 		int send_frame(std::shared_ptr<AVFrame> frame);
 	};
-} // namespace encoder
+} // namespace obsffmpeg

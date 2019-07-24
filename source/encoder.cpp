@@ -19,7 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "generic.hpp"
+#include "encoder.hpp"
 #include <iomanip>
 #include <sstream>
 #include <thread>
@@ -51,11 +51,11 @@ extern "C" {
 
 enum class keyframe_type { Seconds, Frames };
 
-encoder::generic_factory::generic_factory(AVCodec* codec) : avcodec_ptr(codec), info() {}
+obsffmpeg::encoder_factory::encoder_factory(AVCodec* codec) : avcodec_ptr(codec), info() {}
 
-encoder::generic_factory::~generic_factory() {}
+obsffmpeg::encoder_factory::~encoder_factory() {}
 
-void encoder::generic_factory::register_encoder()
+void obsffmpeg::encoder_factory::register_encoder()
 {
 	// Generate unique name from given Id
 	{
@@ -109,7 +109,7 @@ void encoder::generic_factory::register_encoder()
 	// Register functions.
 	this->info.oei.create = [](obs_data_t* settings, obs_encoder_t* encoder) {
 		try {
-			return reinterpret_cast<void*>(new generic(settings, encoder));
+			return reinterpret_cast<void*>(new obsffmpeg::encoder(settings, encoder));
 		} catch (std::exception const& e) {
 			PLOG_ERROR("exception: %s", e.what());
 			return reinterpret_cast<void*>(0);
@@ -120,7 +120,7 @@ void encoder::generic_factory::register_encoder()
 	};
 	this->info.oei.destroy = [](void* ptr) {
 		try {
-			delete reinterpret_cast<generic*>(ptr);
+			delete reinterpret_cast<encoder*>(ptr);
 		} catch (std::exception const& e) {
 			PLOG_ERROR("exception: %s", e.what());
 			throw e;
@@ -131,7 +131,7 @@ void encoder::generic_factory::register_encoder()
 	};
 	this->info.oei.get_name = [](void* type_data) {
 		try {
-			return reinterpret_cast<generic_factory*>(type_data)->get_name();
+			return reinterpret_cast<encoder_factory*>(type_data)->get_name();
 		} catch (std::exception const& e) {
 			PLOG_ERROR("exception: %s", e.what());
 			throw e;
@@ -142,7 +142,7 @@ void encoder::generic_factory::register_encoder()
 	};
 	this->info.oei.get_defaults2 = [](obs_data_t* settings, void* type_data) {
 		try {
-			reinterpret_cast<generic_factory*>(type_data)->get_defaults(settings);
+			reinterpret_cast<encoder_factory*>(type_data)->get_defaults(settings);
 		} catch (std::exception const& e) {
 			PLOG_ERROR("exception: %s", e.what());
 			throw e;
@@ -155,10 +155,10 @@ void encoder::generic_factory::register_encoder()
 		try {
 			obs_properties_t* props = obs_properties_create();
 			if (type_data != nullptr) {
-				reinterpret_cast<generic_factory*>(type_data)->get_properties(props);
+				reinterpret_cast<encoder_factory*>(type_data)->get_properties(props);
 			}
 			if (ptr != nullptr) {
-				reinterpret_cast<generic*>(ptr)->get_properties(props);
+				reinterpret_cast<encoder*>(ptr)->get_properties(props);
 			}
 			return props;
 		} catch (std::exception const& e) {
@@ -171,7 +171,7 @@ void encoder::generic_factory::register_encoder()
 	};
 	this->info.oei.update = [](void* ptr, obs_data_t* settings) {
 		try {
-			return reinterpret_cast<generic*>(ptr)->update(settings);
+			return reinterpret_cast<encoder*>(ptr)->update(settings);
 		} catch (std::exception const& e) {
 			PLOG_ERROR("exception: %s", e.what());
 			throw e;
@@ -182,7 +182,7 @@ void encoder::generic_factory::register_encoder()
 	};
 	this->info.oei.get_sei_data = [](void* ptr, uint8_t** sei_data, size_t* size) {
 		try {
-			return reinterpret_cast<generic*>(ptr)->get_sei_data(sei_data, size);
+			return reinterpret_cast<encoder*>(ptr)->get_sei_data(sei_data, size);
 		} catch (std::exception const& e) {
 			PLOG_ERROR("exception: %s", e.what());
 			throw e;
@@ -193,7 +193,7 @@ void encoder::generic_factory::register_encoder()
 	};
 	this->info.oei.get_extra_data = [](void* ptr, uint8_t** extra_data, size_t* size) {
 		try {
-			return reinterpret_cast<generic*>(ptr)->get_extra_data(extra_data, size);
+			return reinterpret_cast<encoder*>(ptr)->get_extra_data(extra_data, size);
 		} catch (std::exception const& e) {
 			PLOG_ERROR("exception: %s", e.what());
 			throw e;
@@ -206,7 +206,7 @@ void encoder::generic_factory::register_encoder()
 	if (this->avcodec_ptr->type == AVMediaType::AVMEDIA_TYPE_VIDEO) {
 		this->info.oei.get_video_info = [](void* ptr, struct video_scale_info* info) {
 			try {
-				reinterpret_cast<generic*>(ptr)->get_video_info(info);
+				reinterpret_cast<encoder*>(ptr)->get_video_info(info);
 			} catch (std::exception const& e) {
 				PLOG_ERROR("exception: %s", e.what());
 				throw e;
@@ -218,7 +218,7 @@ void encoder::generic_factory::register_encoder()
 		this->info.oei.encode = [](void* ptr, struct encoder_frame* frame, struct encoder_packet* packet,
 		                           bool* received_packet) {
 			try {
-				return reinterpret_cast<generic*>(ptr)->video_encode(frame, packet, received_packet);
+				return reinterpret_cast<encoder*>(ptr)->video_encode(frame, packet, received_packet);
 			} catch (std::exception const& e) {
 				PLOG_ERROR("exception: %s", e.what());
 				throw e;
@@ -231,7 +231,7 @@ void encoder::generic_factory::register_encoder()
 		                                   uint64_t* next_key, struct encoder_packet* packet,
 		                                   bool* received_packet) {
 			try {
-				return reinterpret_cast<generic*>(ptr)->video_encode_texture(
+				return reinterpret_cast<encoder*>(ptr)->video_encode_texture(
 				    handle, pts, lock_key, next_key, packet, received_packet);
 			} catch (std::exception const& e) {
 				PLOG_ERROR("exception: %s", e.what());
@@ -245,7 +245,7 @@ void encoder::generic_factory::register_encoder()
 	} else if (this->avcodec_ptr->type == AVMediaType::AVMEDIA_TYPE_AUDIO) {
 		this->info.oei.get_audio_info = [](void* ptr, struct audio_convert_info* info) {
 			try {
-				reinterpret_cast<generic*>(ptr)->get_audio_info(info);
+				reinterpret_cast<encoder*>(ptr)->get_audio_info(info);
 			} catch (std::exception const& e) {
 				PLOG_ERROR("exception: %s", e.what());
 				throw e;
@@ -256,7 +256,7 @@ void encoder::generic_factory::register_encoder()
 		};
 		this->info.oei.get_frame_size = [](void* ptr) {
 			try {
-				return reinterpret_cast<generic*>(ptr)->get_frame_size();
+				return reinterpret_cast<encoder*>(ptr)->get_frame_size();
 			} catch (std::exception const& e) {
 				PLOG_ERROR("exception: %s", e.what());
 				throw e;
@@ -268,7 +268,7 @@ void encoder::generic_factory::register_encoder()
 		this->info.oei.encode = [](void* ptr, struct encoder_frame* frame, struct encoder_packet* packet,
 		                           bool* received_packet) {
 			try {
-				return reinterpret_cast<generic*>(ptr)->audio_encode(frame, packet, received_packet);
+				return reinterpret_cast<encoder*>(ptr)->audio_encode(frame, packet, received_packet);
 			} catch (std::exception const& e) {
 				PLOG_ERROR("exception: %s", e.what());
 				throw e;
@@ -287,12 +287,12 @@ void encoder::generic_factory::register_encoder()
 	           avcodec_ptr->name, avcodec_ptr->long_name, avcodec_ptr->capabilities);
 }
 
-const char* encoder::generic_factory::get_name()
+const char* obsffmpeg::encoder_factory::get_name()
 {
 	return this->info.readable_name.c_str();
 }
 
-void encoder::generic_factory::get_defaults(obs_data_t* settings)
+void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings)
 {
 	{ // Handler
 		auto ptr = obsffmpeg::find_codec_handler(this->avcodec_ptr->name);
@@ -310,7 +310,7 @@ void encoder::generic_factory::get_defaults(obs_data_t* settings)
 	}
 }
 
-void encoder::generic_factory::get_properties(obs_properties_t* props)
+void obsffmpeg::encoder_factory::get_properties(obs_properties_t* props)
 {
 	{ // Handler
 		auto ptr = obsffmpeg::find_codec_handler(this->avcodec_ptr->name);
@@ -366,15 +366,15 @@ void encoder::generic_factory::get_properties(obs_properties_t* props)
 	};
 }
 
-AVCodec* encoder::generic_factory::get_avcodec()
+AVCodec* obsffmpeg::encoder_factory::get_avcodec()
 {
 	return this->avcodec_ptr;
 }
 
-encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
+obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder)
     : self(encoder), lag_in_frames(0), frame_count(0)
 {
-	this->factory = reinterpret_cast<generic_factory*>(obs_encoder_get_type_data(self));
+	this->factory = reinterpret_cast<encoder_factory*>(obs_encoder_get_type_data(self));
 
 	// Verify that the codec actually still exists.
 	this->codec = avcodec_find_encoder_by_name(this->factory->get_avcodec()->name);
@@ -548,7 +548,7 @@ encoder::generic::generic(obs_data_t* settings, obs_encoder_t* encoder)
 	av_new_packet(&this->current_packet, 8 * 1024 * 1024); // 8 MB precached Packet size.
 }
 
-encoder::generic::~generic()
+obsffmpeg::encoder::~encoder()
 {
 	av_packet_unref(&this->current_packet);
 
@@ -562,7 +562,7 @@ encoder::generic::~generic()
 	}
 }
 
-void encoder::generic::get_properties(obs_properties_t* props)
+void obsffmpeg::encoder::get_properties(obs_properties_t* props)
 {
 	{ // Handler
 		auto ptr = obsffmpeg::find_codec_handler(this->codec->name);
@@ -576,7 +576,7 @@ void encoder::generic::get_properties(obs_properties_t* props)
 	obs_property_set_enabled(obs_properties_get(props, P_FFMPEG_STANDARDCOMPLIANCE), false);
 }
 
-bool encoder::generic::update(obs_data_t* settings)
+bool obsffmpeg::encoder::update(obs_data_t* settings)
 {
 	{ // Handler
 		auto ptr = obsffmpeg::find_codec_handler(this->codec->name);
@@ -593,26 +593,26 @@ bool encoder::generic::update(obs_data_t* settings)
 	return false;
 }
 
-void encoder::generic::get_audio_info(audio_convert_info*) {}
+void obsffmpeg::encoder::get_audio_info(audio_convert_info*) {}
 
-size_t encoder::generic::get_frame_size()
+size_t obsffmpeg::encoder::get_frame_size()
 {
 	return size_t();
 }
 
-bool encoder::generic::audio_encode(encoder_frame*, encoder_packet*, bool*)
+bool obsffmpeg::encoder::audio_encode(encoder_frame*, encoder_packet*, bool*)
 {
 	return false;
 }
 
-void encoder::generic::get_video_info(video_scale_info*) {}
+void obsffmpeg::encoder::get_video_info(video_scale_info*) {}
 
-bool encoder::generic::get_sei_data(uint8_t**, size_t*)
+bool obsffmpeg::encoder::get_sei_data(uint8_t**, size_t*)
 {
 	return false;
 }
 
-bool encoder::generic::get_extra_data(uint8_t** extra_data, size_t* size)
+bool obsffmpeg::encoder::get_extra_data(uint8_t** extra_data, size_t* size)
 {
 	if (!this->context->extradata) {
 		return false;
@@ -652,7 +652,7 @@ static inline void copy_data(encoder_frame* frame, AVFrame* vframe)
 	}
 }
 
-bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
+bool obsffmpeg::encoder::video_encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
 {
 	// Convert frame.
 	std::shared_ptr<AVFrame> vframe = frame_queue.pop(); // Retrieve an empty frame.
@@ -776,12 +776,12 @@ bool encoder::generic::video_encode(encoder_frame* frame, encoder_packet* packet
 	return true;
 }
 
-bool encoder::generic::video_encode_texture(uint32_t, int64_t, uint64_t, uint64_t*, encoder_packet*, bool*)
+bool obsffmpeg::encoder::video_encode_texture(uint32_t, int64_t, uint64_t, uint64_t*, encoder_packet*, bool*)
 {
 	return false;
 }
 
-int encoder::generic::receive_packet(bool* received_packet, struct encoder_packet* packet)
+int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_packet* packet)
 {
 	int res = avcodec_receive_packet(this->context, &this->current_packet);
 	if (res == 0) {
@@ -803,7 +803,7 @@ int encoder::generic::receive_packet(bool* received_packet, struct encoder_packe
 	return res;
 }
 
-int encoder::generic::send_frame(std::shared_ptr<AVFrame> const frame)
+int obsffmpeg::encoder::send_frame(std::shared_ptr<AVFrame> const frame)
 {
 	int res = avcodec_send_frame(this->context, frame.get());
 	switch (res) {
