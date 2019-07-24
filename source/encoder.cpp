@@ -76,6 +76,10 @@ void obsffmpeg::encoder_factory::register_encoder()
 			sstr << " [" << caps << "]";
 		}
 		this->info.readable_name = sstr.str();
+
+		// Allow UI Handler to replace visible name.
+		obsffmpeg::find_codec_handler(this->avcodec_ptr->name)
+		    ->override_visible_name(this->avcodec_ptr, this->info.readable_name);
 	}
 
 	// Assign Ids.

@@ -21,7 +21,10 @@
 
 #pragma once
 
+#include <string>
+
 extern "C" {
+#include <obs-data.h>
 #include <obs-properties.h>
 #pragma warning(push)
 #pragma warning(disable : 4244)
@@ -33,6 +36,8 @@ namespace obsffmpeg {
 	namespace ui {
 		class handler {
 			public:
+			virtual void override_visible_name(AVCodec* codec, std::string& name);
+
 			virtual void get_defaults(obs_data_t* settings, AVCodec* codec, AVCodecContext* context) = 0;
 
 			virtual void get_properties(obs_properties_t* props, AVCodec* codec,
