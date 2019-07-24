@@ -24,11 +24,13 @@
 
 std::shared_ptr<AVFrame> ffmpeg::avframe_queue::create_frame()
 {
-	std::shared_ptr<AVFrame> frame =
-	    std::shared_ptr<AVFrame>(av_frame_alloc(), [](AVFrame* frame) { av_frame_free(&frame); });
-	frame->width  = this->resolution.first;
-	frame->height = this->resolution.second;
-	frame->format = this->format;
+	std::shared_ptr<AVFrame> frame = std::shared_ptr<AVFrame>(av_frame_alloc(), [](AVFrame* frame) {
+		av_frame_unref(frame);
+		av_frame_free(&frame);
+	});
+	frame->width                   = this->resolution.first;
+	frame->height                  = this->resolution.second;
+	frame->format                  = this->format;
 
 	int res = av_frame_get_buffer(frame.get(), 32);
 	if (res < 0) {
