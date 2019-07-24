@@ -52,6 +52,14 @@ extern "C" {
 #define P_RATECONTROL_QUALITY_MINIMUM P_RATECONTROL_QUALITY ".Minimum"
 #define P_RATECONTROL_QUALITY_MAXIMUM P_RATECONTROL_QUALITY ".Maximum"
 
+#define P_RATECONTROL_QP P_RATECONTROL ".QP"
+#define P_RATECONTROL_QP_I P_RATECONTROL_QP ".I"
+#define P_RATECONTROL_QP_I_INITIAL P_RATECONTROL_QP_I ".Initial"
+#define P_RATECONTROL_QP_P P_RATECONTROL_QP ".P"
+#define P_RATECONTROL_QP_P_INITIAL P_RATECONTROL_QP_P ".Initial"
+#define P_RATECONTROL_QP_B P_RATECONTROL_QP ".B"
+#define P_RATECONTROL_QP_B_INITIAL P_RATECONTROL_QP_B ".Initial"
+
 #define P_AQ "NVENC.AQ"
 #define P_AQ_SPATIAL P_AQ ".Spatial"
 #define P_AQ_TEMPORAL P_AQ ".Temporal"
@@ -139,12 +147,12 @@ void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, AVCodec*, AVCodecConte
 	obs_data_set_default_int(settings, P_RATECONTROL_QUALITY_MINIMUM, 51);
 	obs_data_set_default_int(settings, P_RATECONTROL_QUALITY_MAXIMUM, -1);
 
-	obs_data_set_default_int(settings, G_RATECONTROL_QP_I, 21);
-	obs_data_set_default_int(settings, G_RATECONTROL_QP_P, 21);
-	obs_data_set_default_int(settings, G_RATECONTROL_QP_B, 21);
-	obs_data_set_default_int(settings, G_RATECONTROL_QP_I_INITIAL, -1);
-	obs_data_set_default_int(settings, G_RATECONTROL_QP_P_INITIAL, -1);
-	obs_data_set_default_int(settings, G_RATECONTROL_QP_B_INITIAL, -1);
+	obs_data_set_default_int(settings, P_RATECONTROL_QP_I, 21);
+	obs_data_set_default_int(settings, P_RATECONTROL_QP_I_INITIAL, -1);
+	obs_data_set_default_int(settings, P_RATECONTROL_QP_P, 21);
+	obs_data_set_default_int(settings, P_RATECONTROL_QP_P_INITIAL, -1);
+	obs_data_set_default_int(settings, P_RATECONTROL_QP_B, 21);
+	obs_data_set_default_int(settings, P_RATECONTROL_QP_B_INITIAL, -1);
 
 	obs_data_set_default_int(settings, G_KEYFRAMES_INTERVALTYPE, 0);
 	obs_data_set_default_double(settings, G_KEYFRAMES_INTERVAL_SECONDS, 2.0);
@@ -199,12 +207,12 @@ static bool modified_ratecontrol(obs_properties_t* props, obs_property_t*, obs_d
 	obs_property_set_visible(obs_properties_get(props, P_RATECONTROL_QUALITY_MINIMUM), have_quality);
 	obs_property_set_visible(obs_properties_get(props, P_RATECONTROL_QUALITY_MAXIMUM), have_quality);
 
-	obs_property_set_visible(obs_properties_get(props, G_RATECONTROL_QP_I), have_qp);
-	obs_property_set_visible(obs_properties_get(props, G_RATECONTROL_QP_P), have_qp);
-	obs_property_set_visible(obs_properties_get(props, G_RATECONTROL_QP_B), have_qp);
-	obs_property_set_visible(obs_properties_get(props, G_RATECONTROL_QP_I_INITIAL), have_qp_init);
-	obs_property_set_visible(obs_properties_get(props, G_RATECONTROL_QP_P_INITIAL), have_qp_init);
-	obs_property_set_visible(obs_properties_get(props, G_RATECONTROL_QP_B_INITIAL), have_qp_init);
+	obs_property_set_visible(obs_properties_get(props, P_RATECONTROL_QP_I), have_qp);
+	obs_property_set_visible(obs_properties_get(props, P_RATECONTROL_QP_P), have_qp);
+	obs_property_set_visible(obs_properties_get(props, P_RATECONTROL_QP_B), have_qp);
+	obs_property_set_visible(obs_properties_get(props, P_RATECONTROL_QP_I_INITIAL), have_qp_init);
+	obs_property_set_visible(obs_properties_get(props, P_RATECONTROL_QP_P_INITIAL), have_qp_init);
+	obs_property_set_visible(obs_properties_get(props, P_RATECONTROL_QP_B_INITIAL), have_qp_init);
 
 	return true;
 }
@@ -289,37 +297,6 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, AVCodec* cod
 			    obs_properties_add_bool(grp, P_RATECONTROL_ADAPTIVEB, TRANSLATE(P_RATECONTROL_ADAPTIVEB));
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_RATECONTROL_ADAPTIVEB)));
 		}
-
-		{
-			auto p = obs_properties_add_int_slider(grp, G_RATECONTROL_QP_I, TRANSLATE(G_RATECONTROL_QP_I),
-			                                       0, 51, 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(G_RATECONTROL_QP_I)));
-		}
-		{
-			auto p = obs_properties_add_int_slider(grp, G_RATECONTROL_QP_I_INITIAL,
-			                                       TRANSLATE(G_RATECONTROL_QP_I_INITIAL), -1, 51, 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(G_RATECONTROL_QP_I_INITIAL)));
-		}
-		{
-			auto p = obs_properties_add_int_slider(grp, G_RATECONTROL_QP_P, TRANSLATE(G_RATECONTROL_QP_P),
-			                                       0, 51, 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(G_RATECONTROL_QP_P)));
-		}
-		{
-			auto p = obs_properties_add_int_slider(grp, G_RATECONTROL_QP_P_INITIAL,
-			                                       TRANSLATE(G_RATECONTROL_QP_P_INITIAL), -1, 51, 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(G_RATECONTROL_QP_P_INITIAL)));
-		}
-		{
-			auto p = obs_properties_add_int_slider(grp, G_RATECONTROL_QP_B, TRANSLATE(G_RATECONTROL_QP_B),
-			                                       0, 51, 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(G_RATECONTROL_QP_B)));
-		}
-		{
-			auto p = obs_properties_add_int_slider(grp, G_RATECONTROL_QP_B_INITIAL,
-			                                       TRANSLATE(G_RATECONTROL_QP_B_INITIAL), -1, 51, 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(G_RATECONTROL_QP_B_INITIAL)));
-		}
 	}
 
 	{
@@ -375,6 +352,46 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, AVCodec* cod
 			auto p = obs_properties_add_int_slider(grp, P_RATECONTROL_QUALITY_MAXIMUM,
 			                                       TRANSLATE(P_RATECONTROL_QUALITY_MAXIMUM), -1, 51, 1);
 			obs_property_set_long_description(p, TRANSLATE(DESC(P_RATECONTROL_QUALITY_MAXIMUM)));
+		}
+	}
+	{
+		obs_properties_t* grp = props;
+		if (!obsffmpeg::are_property_groups_broken()) {
+			grp    = obs_properties_create();
+			auto p = obs_properties_add_group(props, P_RATECONTROL_QP, TRANSLATE(P_RATECONTROL_QP),
+			                                  OBS_GROUP_CHECKABLE, grp);
+			obs_property_set_modified_callback(p, modified_quality);
+		}
+
+		{
+			auto p = obs_properties_add_int_slider(grp, P_RATECONTROL_QP_I, TRANSLATE(P_RATECONTROL_QP_I),
+			                                       0, 51, 1);
+			obs_property_set_long_description(p, TRANSLATE(DESC(P_RATECONTROL_QP_I)));
+		}
+		{
+			auto p = obs_properties_add_int_slider(grp, P_RATECONTROL_QP_I_INITIAL,
+			                                       TRANSLATE(P_RATECONTROL_QP_I_INITIAL), -1, 51, 1);
+			obs_property_set_long_description(p, TRANSLATE(DESC(P_RATECONTROL_QP_I_INITIAL)));
+		}
+		{
+			auto p = obs_properties_add_int_slider(grp, P_RATECONTROL_QP_P, TRANSLATE(P_RATECONTROL_QP_P),
+			                                       0, 51, 1);
+			obs_property_set_long_description(p, TRANSLATE(DESC(P_RATECONTROL_QP_P)));
+		}
+		{
+			auto p = obs_properties_add_int_slider(grp, P_RATECONTROL_QP_P_INITIAL,
+			                                       TRANSLATE(P_RATECONTROL_QP_P_INITIAL), -1, 51, 1);
+			obs_property_set_long_description(p, TRANSLATE(DESC(P_RATECONTROL_QP_P_INITIAL)));
+		}
+		{
+			auto p = obs_properties_add_int_slider(grp, P_RATECONTROL_QP_B, TRANSLATE(P_RATECONTROL_QP_B),
+			                                       0, 51, 1);
+			obs_property_set_long_description(p, TRANSLATE(DESC(P_RATECONTROL_QP_B)));
+		}
+		{
+			auto p = obs_properties_add_int_slider(grp, P_RATECONTROL_QP_B_INITIAL,
+			                                       TRANSLATE(P_RATECONTROL_QP_B_INITIAL), -1, 51, 1);
+			obs_property_set_long_description(p, TRANSLATE(DESC(P_RATECONTROL_QP_B_INITIAL)));
 		}
 	}
 
@@ -492,6 +509,13 @@ void obsffmpeg::nvenc::get_runtime_properties(obs_properties_t* props, AVCodec*,
 	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QUALITY), false);
 	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QUALITY_MINIMUM), false);
 	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QUALITY_MAXIMUM), false);
+	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QP), false);
+	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QP_I), false);
+	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QP_I_INITIAL), false);
+	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QP_P), false);
+	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QP_P_INITIAL), false);
+	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QP_B), false);
+	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL_QP_B_INITIAL), false);
 	obs_property_set_enabled(obs_properties_get(props, G_KEYFRAMES), false);
 	obs_property_set_enabled(obs_properties_get(props, G_KEYFRAMES_INTERVALTYPE), false);
 	obs_property_set_enabled(obs_properties_get(props, G_KEYFRAMES_INTERVAL_SECONDS), false);
@@ -592,19 +616,19 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, AVCodec* codec, AVCodecConte
 
 		if (have_qp) {
 			av_opt_set_int(context->priv_data, "init_qpI",
-			               static_cast<int>(obs_data_get_int(settings, G_RATECONTROL_QP_I)), 0);
+			               static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_QP_I)), 0);
 			av_opt_set_int(context->priv_data, "init_qpP",
-			               static_cast<int>(obs_data_get_int(settings, G_RATECONTROL_QP_P)), 0);
+			               static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_QP_P)), 0);
 			av_opt_set_int(context->priv_data, "init_qpB",
-			               static_cast<int>(obs_data_get_int(settings, G_RATECONTROL_QP_B)), 0);
+			               static_cast<int>(obs_data_get_int(settings, P_RATECONTROL_QP_B)), 0);
 		}
 		if (have_qp_init) {
 			av_opt_set_int(context->priv_data, "init_qpI",
-			               obs_data_get_int(settings, G_RATECONTROL_QP_I_INITIAL), 0);
+			               obs_data_get_int(settings, P_RATECONTROL_QP_I_INITIAL), 0);
 			av_opt_set_int(context->priv_data, "init_qpP",
-			               obs_data_get_int(settings, G_RATECONTROL_QP_P_INITIAL), 0);
+			               obs_data_get_int(settings, P_RATECONTROL_QP_P_INITIAL), 0);
 			av_opt_set_int(context->priv_data, "init_qpB",
-			               obs_data_get_int(settings, G_RATECONTROL_QP_B_INITIAL), 0);
+			               obs_data_get_int(settings, P_RATECONTROL_QP_B_INITIAL), 0);
 		}
 	}
 
