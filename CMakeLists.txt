@@ -261,8 +261,6 @@ set(PROJECT_GENERATED
 	"${PROJECT_BINARY_DIR}/source/version.hpp"
 )
 set(PROJECT_PRIVATE
-	"${PROJECT_SOURCE_DIR}/source/encoder.cpp"
-	"${PROJECT_SOURCE_DIR}/source/encoder.hpp"
 	"${PROJECT_SOURCE_DIR}/source/plugin.cpp"
 	"${PROJECT_SOURCE_DIR}/source/plugin.hpp"
 	"${PROJECT_SOURCE_DIR}/source/utility.cpp"
@@ -274,8 +272,6 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/codecs/h264.cpp"
 	"${PROJECT_SOURCE_DIR}/source/encoders/generic.hpp"
 	"${PROJECT_SOURCE_DIR}/source/encoders/generic.cpp"
-	"${PROJECT_SOURCE_DIR}/source/encoders/prores_aw.hpp"
-	"${PROJECT_SOURCE_DIR}/source/encoders/prores_aw.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/avframe-queue.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/avframe-queue.hpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/swscale.hpp"
