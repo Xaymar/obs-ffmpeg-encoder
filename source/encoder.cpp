@@ -26,13 +26,14 @@
 #include <util/profiler.hpp>
 #include "ffmpeg/tools.hpp"
 #include "plugin.hpp"
-#include "utility.hpp"
 #include "strings.hpp"
+#include "utility.hpp"
 
 extern "C" {
 #include <obs-module.h>
 #pragma warning(push)
 #pragma warning(disable : 4244)
+#include <libavcodec/avcodec.h>
 #include <libavutil/dict.h>
 #include <libavutil/frame.h>
 #include <libavutil/opt.h>
@@ -299,17 +300,17 @@ const char* obsffmpeg::encoder_factory::get_name()
 
 void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings)
 {
-	if (!this->avcodec_ptr->capabilities & AV_CODEC_CAP_INTRA_ONLY) {
-		obs_data_set_default_int(settings, G_KEYFRAMES_INTERVALTYPE, 0);
-		obs_data_set_default_double(settings, G_KEYFRAMES_INTERVAL_SECONDS, 2.0);
-		obs_data_set_default_int(settings, G_KEYFRAMES_INTERVAL_FRAMES, 300);
-	}
-
 	{ // Handler
 		auto ptr = obsffmpeg::find_codec_handler(this->avcodec_ptr->name);
 		if (ptr) {
 			ptr->get_defaults(settings, this->avcodec_ptr, nullptr);
 		}
+	}
+
+	if ((this->avcodec_ptr->capabilities & AV_CODEC_CAP_INTRA_ONLY) == 0) {
+		obs_data_set_default_int(settings, G_KEYFRAMES_INTERVALTYPE, 0);
+		obs_data_set_default_double(settings, G_KEYFRAMES_INTERVAL_SECONDS, 2.0);
+		obs_data_set_default_int(settings, G_KEYFRAMES_INTERVAL_FRAMES, 300);
 	}
 
 	{ // Integrated Options
@@ -642,7 +643,8 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 		}
 	}
 
-	{ // Key Frames
+	if ((this->codec->capabilities & AV_CODEC_CAP_INTRA_ONLY) == 0) {
+		// Key-Frame Options
 		obs_video_info ovi;
 		if (!obs_get_video_info(&ovi)) {
 			throw std::runtime_error("no video info");
