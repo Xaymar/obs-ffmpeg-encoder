@@ -54,29 +54,20 @@ extern "C" {
 
 enum class keyframe_type { Seconds, Frames };
 
-obsffmpeg::encoder_factory::encoder_factory(AVCodec* codec) : avcodec_ptr(codec), info() {}
-
-obsffmpeg::encoder_factory::~encoder_factory() {}
-
-void obsffmpeg::encoder_factory::register_encoder()
+obsffmpeg::encoder_factory::encoder_factory(AVCodec* codec) : avcodec_ptr(codec), info()
 {
-	// Generate unique name from given Id
-	{
-		std::stringstream sstr;
-		sstr << "ffmpeg-" << avcodec_ptr->name << "-0x" << std::uppercase << std::setfill('0') << std::setw(8)
-		     << std::hex << avcodec_ptr->capabilities;
-		this->info.uid = sstr.str();
-	}
+	// Unique Id is FFmpeg name.
+	this->info.uid = avcodec_ptr->name;
 
 	// Also generate a human readable name while we're at it.
-	// TODO: Figure out a way to translate from names to other names.
 	{
 		std::stringstream sstr;
-		sstr << (avcodec_ptr->long_name ? avcodec_ptr->long_name : avcodec_ptr->name) << " ("
-		     << avcodec_ptr->name << ")";
-		std::string caps = ffmpeg::tools::translate_encoder_capabilities(avcodec_ptr->capabilities);
-		if (caps.length() != 0) {
-			sstr << " [" << caps << "]";
+		if (!obsffmpeg::has_codec_handler(avcodec_ptr->name)) {
+			sstr << "[UNSUPPORTED] ";
+		}
+		sstr << (avcodec_ptr->long_name ? avcodec_ptr->long_name : avcodec_ptr->name);
+		if (avcodec_ptr->long_name) {
+			sstr << " (" << avcodec_ptr->name << ")";
 		}
 		this->info.readable_name = sstr.str();
 
@@ -91,19 +82,27 @@ void obsffmpeg::encoder_factory::register_encoder()
 		if (desc) {
 			this->info.codec = desc->name;
 		} else {
+			// Fall back to encoder name in the case that FFmpeg itself doesn't know
+			// what codec this actually is.
 			this->info.codec = avcodec_ptr->name;
 		}
 	}
+
 	this->info.oei.id    = this->info.uid.c_str();
 	this->info.oei.codec = this->info.codec.c_str();
 
-	// Is this a deprecated encoder?
 #ifndef _DEBUG
+	// Is this a deprecated encoder?
 	if (!obsffmpeg::has_codec_handler(avcodec_ptr->name)) {
 		this->info.oei.caps |= OBS_ENCODER_CAP_DEPRECATED;
 	}
 #endif
+}
 
+obsffmpeg::encoder_factory::~encoder_factory() {}
+
+void obsffmpeg::encoder_factory::register_encoder()
+{
 	// Detect encoder type (only Video and Audio supported)
 	if (avcodec_ptr->type == AVMediaType::AVMEDIA_TYPE_VIDEO) {
 		this->info.oei.type = obs_encoder_type::OBS_ENCODER_VIDEO;
