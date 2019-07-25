@@ -60,10 +60,6 @@ namespace obsffmpeg {
 		void get_properties(obs_properties_t* props);
 
 		AVCodec* get_avcodec();
-
-		public:
-		static bool modified_ratecontrol_properties(void* priv, obs_properties_t* props, obs_property_t* prop,
-		                                            obs_data_t* settings);
 	};
 
 	class encoder {
