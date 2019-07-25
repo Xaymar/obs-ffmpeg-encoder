@@ -34,6 +34,8 @@ namespace obsffmpeg {
 	namespace ui {
 		class nvenc_hevc_handler : public handler {
 			public:
+			virtual void override_visible_name(AVCodec* codec, std::string& name) override;
+
 			virtual void get_defaults(obs_data_t* settings, AVCodec* codec,
 			                          AVCodecContext* context) override;
 

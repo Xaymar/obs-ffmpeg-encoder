@@ -82,6 +82,10 @@ INITIALIZER(nvenc_hevc_handler_init)
 	});
 };
 
+void obsffmpeg::ui::nvenc_hevc_handler::override_visible_name(AVCodec* codec, std::string& name) {
+	name = "H.265/HEVC Encoder (NVidia NVENC)";
+}
+
 void obsffmpeg::ui::nvenc_hevc_handler::get_defaults(obs_data_t* settings, AVCodec* codec, AVCodecContext* context)
 {
 	nvenc::get_defaults(settings, codec, context);
