@@ -79,6 +79,10 @@ INITIALIZER(nvenc_h264_handler_init)
 	});
 };
 
+void obsffmpeg::ui::nvenc_h264_handler::override_visible_name(AVCodec* codec, std::string& name) {
+	name = "H.264/AVC Encoder (NVidia NVENC)";
+}
+
 void obsffmpeg::ui::nvenc_h264_handler::get_defaults(obs_data_t* settings, AVCodec* codec, AVCodecContext* context)
 {
 	nvenc::get_defaults(settings, codec, context);
