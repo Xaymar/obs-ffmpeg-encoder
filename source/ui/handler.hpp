@@ -36,14 +36,15 @@ namespace obsffmpeg {
 	namespace ui {
 		class handler {
 			public:
-			virtual void override_visible_name(AVCodec* codec, std::string& name);
+			virtual void override_visible_name(const AVCodec* codec, std::string& name);
 
-			virtual void get_defaults(obs_data_t* settings, AVCodec* codec, AVCodecContext* context) = 0;
+			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec,
+			                          AVCodecContext* context) = 0;
 
-			virtual void get_properties(obs_properties_t* props, AVCodec* codec,
+			virtual void get_properties(obs_properties_t* props, const AVCodec* codec,
 			                            AVCodecContext* context) = 0;
 
-			virtual void update(obs_data_t* settings, AVCodec* codec, AVCodecContext* context) = 0;
+			virtual void update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context) = 0;
 		};
 	} // namespace ui
 } // namespace obsffmpeg

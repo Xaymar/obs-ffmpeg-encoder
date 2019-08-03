@@ -21,4 +21,4 @@
 
 #include "handler.hpp"
 
-void obsffmpeg::ui::handler::override_visible_name(AVCodec* codec, std::string& name) {}
+void obsffmpeg::ui::handler::override_visible_name(const AVCodec*, std::string&) {}

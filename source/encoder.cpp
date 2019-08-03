@@ -54,7 +54,7 @@ extern "C" {
 
 enum class keyframe_type { Seconds, Frames };
 
-obsffmpeg::encoder_factory::encoder_factory(AVCodec* codec) : avcodec_ptr(codec), info()
+obsffmpeg::encoder_factory::encoder_factory(const AVCodec * codec) : avcodec_ptr(codec), info()
 {
 	// Unique Id is FFmpeg name.
 	this->info.uid = avcodec_ptr->name;
@@ -419,7 +419,7 @@ void obsffmpeg::encoder_factory::get_properties(obs_properties_t* props)
 	};
 }
 
-AVCodec* obsffmpeg::encoder_factory::get_avcodec()
+const AVCodec* obsffmpeg::encoder_factory::get_avcodec()
 {
 	return this->avcodec_ptr;
 }

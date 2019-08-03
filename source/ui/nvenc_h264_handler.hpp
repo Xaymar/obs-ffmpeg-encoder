@@ -34,20 +34,22 @@ namespace obsffmpeg {
 	namespace ui {
 		class nvenc_h264_handler : public handler {
 			public:
-			virtual void override_visible_name(AVCodec* codec, std::string& name) override;
+			virtual void override_visible_name(const AVCodec* codec, std::string& name) override;
 
-			virtual void get_defaults(obs_data_t* settings, AVCodec* codec,
+			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec,
 			                          AVCodecContext* context) override;
 
-			virtual void get_properties(obs_properties_t* props, AVCodec* codec,
+			virtual void get_properties(obs_properties_t* props, const AVCodec* codec,
 			                            AVCodecContext* context) override;
 
-			virtual void update(obs_data_t* settings, AVCodec* codec, AVCodecContext* context) override;
+			virtual void update(obs_data_t* settings, const AVCodec* codec,
+			                    AVCodecContext* context) override;
 
 			private:
-			void get_encoder_properties(obs_properties_t* props, AVCodec* codec);
+			void get_encoder_properties(obs_properties_t* props, const AVCodec* codec);
 
-			void get_runtime_properties(obs_properties_t* props, AVCodec* codec, AVCodecContext* context);
+			void get_runtime_properties(obs_properties_t* props, const AVCodec* codec,
+			                            AVCodecContext* context);
 		};
 	} // namespace ui
 } // namespace obsffmpeg

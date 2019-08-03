@@ -20,12 +20,12 @@
 // SOFTWARE.
 
 #include "plugin.hpp"
+#include <map>
 #include <memory>
 #include "encoder.hpp"
 #include "ui/debug_handler.hpp"
 #include "ui/handler.hpp"
 #include "utility.hpp"
-#include <map>
 
 extern "C" {
 #include <obs-module.h>
@@ -64,12 +64,18 @@ bool obsffmpeg::has_codec_handler(std::string const codec)
 	return (found != codec_to_handler_map.end());
 }
 
-static std::map<AVCodec*, std::shared_ptr<obsffmpeg::encoder_factory>> generic_factories;
+static std::map<const AVCodec*, std::shared_ptr<obsffmpeg::encoder_factory>> generic_factories;
 
+#pragma warning(push)
+#pragma warning(disable : 4996) // Handled by software and precompiler branch
 MODULE_EXPORT bool obs_module_load(void)
 try {
-	// Initialize avcodec.
-	avcodec_register_all();
+#if FF_API_NEXT
+	if (avcodec_version() < AV_VERSION_INT(58, 0, 0)) {
+		// Initialize avcodec.
+		avcodec_register_all();
+	}
+#endif
 
 	// Run all initializers.
 	for (auto const func : obsffmpeg::initializers) {
@@ -77,17 +83,40 @@ try {
 	}
 
 	// Register all codecs.
-	AVCodec* cdc = nullptr;
-	while ((cdc = av_codec_next(cdc)) != nullptr) {
-		if (!av_codec_is_encoder(cdc))
-			continue;
+#if FF_API_NEXT
+	if (avcodec_version() < AV_VERSION_INT(58, 0, 0)) {
+		AVCodec* cdc = nullptr;
+		while ((cdc = av_codec_next(cdc)) != nullptr) {
+			if (!av_codec_is_encoder(cdc))
+				continue;
 
-		if ((cdc->type == AVMediaType::AVMEDIA_TYPE_AUDIO) || (cdc->type == AVMediaType::AVMEDIA_TYPE_VIDEO)) {
-			auto ptr = std::make_shared<obsffmpeg::encoder_factory>(cdc);
-			ptr->register_encoder();
-			generic_factories.emplace(cdc, ptr);
+			if ((cdc->type == AVMediaType::AVMEDIA_TYPE_AUDIO)
+			    || (cdc->type == AVMediaType::AVMEDIA_TYPE_VIDEO)) {
+				auto ptr = std::make_shared<obsffmpeg::encoder_factory>(cdc);
+				ptr->register_encoder();
+				generic_factories.emplace(cdc, ptr);
+			}
 		}
+	} else {
+#endif
+#if LIBAVCODEC_VERSION_MAJOR >= 58
+		void*          storage = nullptr;
+		const AVCodec* cdc     = nullptr;
+		for (cdc = av_codec_iterate(&storage); cdc != nullptr; cdc = av_codec_iterate(&storage)) {
+			if (!av_codec_is_encoder(cdc))
+				continue;
+
+			if ((cdc->type == AVMediaType::AVMEDIA_TYPE_AUDIO)
+			    || (cdc->type == AVMediaType::AVMEDIA_TYPE_VIDEO)) {
+				auto ptr = std::make_shared<obsffmpeg::encoder_factory>(cdc);
+				ptr->register_encoder();
+				generic_factories.emplace(cdc, ptr);
+			}
+		}
+#endif
+#if FF_API_NEXT
 	}
+#endif
 
 	return true;
 } catch (std::exception& ex) {
@@ -97,10 +126,10 @@ try {
 	PLOG_ERROR("Unrecognized exception during initalization.");
 	return false;
 }
+#pragma warning(pop)
 
 MODULE_EXPORT void obs_module_unload(void)
 try {
-
 	// Run all finalizers.
 	for (auto const func : obsffmpeg::finalizers) {
 		func();

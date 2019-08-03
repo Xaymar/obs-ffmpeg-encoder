@@ -41,12 +41,13 @@ INITIALIZER(prores_aw_handler_init)
 	});
 };
 
-void obsffmpeg::ui::prores_aw_handler::get_defaults(obs_data_t* settings, AVCodec*, AVCodecContext*)
+void obsffmpeg::ui::prores_aw_handler::get_defaults(obs_data_t* settings, const AVCodec*, AVCodecContext*)
 {
 	obs_data_set_default_int(settings, P_PROFILE, 0);
 }
 
-void obsffmpeg::ui::prores_aw_handler::get_properties(obs_properties_t* props, AVCodec* codec, AVCodecContext* context)
+void obsffmpeg::ui::prores_aw_handler::get_properties(obs_properties_t* props, const AVCodec* codec,
+                                                      AVCodecContext* context)
 {
 	if (!context) {
 		auto p = obs_properties_add_list(props, P_PROFILE, TRANSLATE(P_PROFILE), OBS_COMBO_TYPE_LIST,
@@ -77,7 +78,7 @@ void obsffmpeg::ui::prores_aw_handler::get_properties(obs_properties_t* props, A
 	}
 }
 
-void obsffmpeg::ui::prores_aw_handler::update(obs_data_t* settings, AVCodec*, AVCodecContext* context)
+void obsffmpeg::ui::prores_aw_handler::update(obs_data_t* settings, const AVCodec*, AVCodecContext* context)
 {
 	context->profile = static_cast<int>(obs_data_get_int(settings, P_PROFILE));
 }

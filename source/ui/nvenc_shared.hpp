@@ -75,14 +75,14 @@ namespace obsffmpeg {
 
 		extern std::map<b_ref_mode, std::string> b_ref_mode_to_opt;
 
-		void get_defaults(obs_data_t* settings, AVCodec* codec, AVCodecContext* context);
+		void get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 
-		void get_properties_pre(obs_properties_t* props, AVCodec* codec);
+		void get_properties_pre(obs_properties_t* props, const AVCodec* codec);
 
-		void get_properties_post(obs_properties_t* props, AVCodec* codec);
+		void get_properties_post(obs_properties_t* props, const AVCodec* codec);
 
-		void get_runtime_properties(obs_properties_t* props, AVCodec* codec, AVCodecContext* context);
+		void get_runtime_properties(obs_properties_t* props, const AVCodec* codec, AVCodecContext* context);
 
-		void update(obs_data_t* settings, AVCodec* codec, AVCodecContext* context);
+		void update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 	} // namespace nvenc
 } // namespace obsffmpeg

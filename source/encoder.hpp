@@ -45,10 +45,10 @@ namespace obsffmpeg {
 			std::string      readable_name;
 			obs_encoder_info oei;
 		} info;
-		AVCodec* avcodec_ptr;
+		const AVCodec* avcodec_ptr;
 
 		public:
-		encoder_factory(AVCodec* codec);
+		encoder_factory(const AVCodec * codec);
 		virtual ~encoder_factory();
 
 		void register_encoder();
@@ -59,14 +59,14 @@ namespace obsffmpeg {
 
 		void get_properties(obs_properties_t* props);
 
-		AVCodec* get_avcodec();
+		const AVCodec* get_avcodec();
 	};
 
 	class encoder {
 		obs_encoder_t*   self;
 		encoder_factory* factory;
 
-		AVCodec*        codec;
+		const AVCodec*  codec;
 		AVCodecContext* context;
 
 		ffmpeg::avframe_queue frame_queue;

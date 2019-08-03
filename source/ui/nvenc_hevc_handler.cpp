@@ -82,11 +82,13 @@ INITIALIZER(nvenc_hevc_handler_init)
 	});
 };
 
-void obsffmpeg::ui::nvenc_hevc_handler::override_visible_name(AVCodec* codec, std::string& name) {
+void obsffmpeg::ui::nvenc_hevc_handler::override_visible_name(const AVCodec*, std::string& name)
+{
 	name = "H.265/HEVC Encoder (NVidia NVENC)";
 }
 
-void obsffmpeg::ui::nvenc_hevc_handler::get_defaults(obs_data_t* settings, AVCodec* codec, AVCodecContext* context)
+void obsffmpeg::ui::nvenc_hevc_handler::get_defaults(obs_data_t* settings, const AVCodec* codec,
+                                                     AVCodecContext* context)
 {
 	nvenc::get_defaults(settings, codec, context);
 
@@ -95,7 +97,8 @@ void obsffmpeg::ui::nvenc_hevc_handler::get_defaults(obs_data_t* settings, AVCod
 	obs_data_set_default_int(settings, P_HEVC_LEVEL, static_cast<int64_t>(codecs::hevc::level::UNKNOWN));
 }
 
-void obsffmpeg::ui::nvenc_hevc_handler::get_properties(obs_properties_t* props, AVCodec* codec, AVCodecContext* context)
+void obsffmpeg::ui::nvenc_hevc_handler::get_properties(obs_properties_t* props, const AVCodec* codec,
+                                                       AVCodecContext* context)
 {
 	if (!context) {
 		this->get_encoder_properties(props, codec);
@@ -104,7 +107,7 @@ void obsffmpeg::ui::nvenc_hevc_handler::get_properties(obs_properties_t* props, 
 	}
 }
 
-void obsffmpeg::ui::nvenc_hevc_handler::update(obs_data_t* settings, AVCodec* codec, AVCodecContext* context)
+void obsffmpeg::ui::nvenc_hevc_handler::update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
 {
 	nvenc::update(settings, codec, context);
 
@@ -130,7 +133,7 @@ void obsffmpeg::ui::nvenc_hevc_handler::update(obs_data_t* settings, AVCodec* co
 	}
 }
 
-void obsffmpeg::ui::nvenc_hevc_handler::get_encoder_properties(obs_properties_t* props, AVCodec* codec)
+void obsffmpeg::ui::nvenc_hevc_handler::get_encoder_properties(obs_properties_t* props, const AVCodec* codec)
 {
 	nvenc::get_properties_pre(props, codec);
 
@@ -178,7 +181,7 @@ void obsffmpeg::ui::nvenc_hevc_handler::get_encoder_properties(obs_properties_t*
 	nvenc::get_properties_post(props, codec);
 }
 
-void obsffmpeg::ui::nvenc_hevc_handler::get_runtime_properties(obs_properties_t* props, AVCodec* codec,
+void obsffmpeg::ui::nvenc_hevc_handler::get_runtime_properties(obs_properties_t* props, const AVCodec* codec,
                                                                AVCodecContext* context)
 {
 	nvenc::get_runtime_properties(props, codec, context);

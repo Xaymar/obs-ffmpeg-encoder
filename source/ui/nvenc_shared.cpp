@@ -130,7 +130,7 @@ std::map<b_ref_mode, std::string> obsffmpeg::nvenc::b_ref_mode_to_opt{
     {b_ref_mode::MIDDLE, "middle"},
 };
 
-void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, AVCodec*, AVCodecContext*)
+void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, const AVCodec*, AVCodecContext*)
 {
 	obs_data_set_default_int(settings, P_PRESET, static_cast<int64_t>(preset::DEFAULT));
 
@@ -228,7 +228,7 @@ static bool modified_aq(obs_properties_t* props, obs_property_t*, obs_data_t* se
 	return true;
 }
 
-void obsffmpeg::nvenc::get_properties_pre(obs_properties_t* props, AVCodec*)
+void obsffmpeg::nvenc::get_properties_pre(obs_properties_t* props, const AVCodec*)
 {
 	{
 		auto p = obs_properties_add_list(props, P_PRESET, TRANSLATE(P_PRESET), OBS_COMBO_TYPE_LIST,
@@ -240,7 +240,7 @@ void obsffmpeg::nvenc::get_properties_pre(obs_properties_t* props, AVCodec*)
 	}
 }
 
-void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, AVCodec* codec)
+void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, const AVCodec* codec)
 {
 	{ // Rate Control
 		obs_properties_t* grp = props;
@@ -449,7 +449,7 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, AVCodec* cod
 	}
 }
 
-void obsffmpeg::nvenc::get_runtime_properties(obs_properties_t* props, AVCodec*, AVCodecContext*)
+void obsffmpeg::nvenc::get_runtime_properties(obs_properties_t* props, const AVCodec*, AVCodecContext*)
 {
 	obs_property_set_enabled(obs_properties_get(props, P_PRESET), false);
 	obs_property_set_enabled(obs_properties_get(props, P_RATECONTROL), false);
@@ -484,7 +484,7 @@ void obsffmpeg::nvenc::get_runtime_properties(obs_properties_t* props, AVCodec*,
 	obs_property_set_enabled(obs_properties_get(props, P_OTHER_NONREFERENCE_PFRAMES), false);
 }
 
-void obsffmpeg::nvenc::update(obs_data_t* settings, AVCodec* codec, AVCodecContext* context)
+void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
 {
 	{
 		preset c_preset = static_cast<preset>(obs_data_get_int(settings, P_PRESET));

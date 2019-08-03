@@ -26,13 +26,14 @@ namespace obsffmpeg {
 	namespace ui {
 		class debug_handler : public handler {
 			public:
-			virtual void get_defaults(obs_data_t* settings, AVCodec* codec,
+			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec,
 			                          AVCodecContext* context) override;
 
-			virtual void get_properties(obs_properties_t* props, AVCodec* codec,
+			virtual void get_properties(obs_properties_t* props, const AVCodec* codec,
 			                            AVCodecContext* context) override;
 
-			virtual void update(obs_data_t* settings, AVCodec* codec, AVCodecContext* context) override;
+			virtual void update(obs_data_t* settings, const AVCodec* codec,
+			                    AVCodecContext* context) override;
 		};
 	} // namespace ui
 } // namespace obsffmpeg
