@@ -204,9 +204,9 @@ static bool modified_ratecontrol(obs_properties_t* props, obs_property_t*, obs_d
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QUALITY), have_quality);
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QUALITY_MINIMUM), have_quality);
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QUALITY_MAXIMUM), have_quality);
-
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QUALITY_TARGET), have_quality);
 
+	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP), have_qp || have_qp_init);
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_I), have_qp);
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_P), have_qp);
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_B), have_qp);
@@ -514,7 +514,6 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCode
 		bool have_bitrate     = false;
 		bool have_bitrate_max = false;
 		bool have_quality     = false;
-		bool have_quality_max = false;
 		bool have_qp          = false;
 		bool have_qp_init     = false;
 
