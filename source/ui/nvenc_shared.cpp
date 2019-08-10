@@ -271,7 +271,7 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, const AVCode
 
 		{
 			auto p = obs_properties_add_int_slider(grp, ST_RATECONTROL_LOOKAHEAD,
-			                                       TRANSLATE(ST_RATECONTROL_LOOKAHEAD), 0, 60, 1);
+			                                       TRANSLATE(ST_RATECONTROL_LOOKAHEAD), 0, 32, 1);
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_RATECONTROL_LOOKAHEAD)));
 			obs_property_int_set_suffix(p, " frames");
 		}
