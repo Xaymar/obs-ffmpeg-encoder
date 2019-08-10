@@ -51,6 +51,7 @@ extern "C" {
 #define ST_RATECONTROL_QUALITY ST_RATECONTROL ".Quality"
 #define ST_RATECONTROL_QUALITY_MINIMUM ST_RATECONTROL_QUALITY ".Minimum"
 #define ST_RATECONTROL_QUALITY_MAXIMUM ST_RATECONTROL_QUALITY ".Maximum"
+#define ST_RATECONTROL_QUALITY_TARGET ST_RATECONTROL_QUALITY ".Target"
 
 #define ST_RATECONTROL_QP ST_RATECONTROL ".QP"
 #define ST_RATECONTROL_QP_I ST_RATECONTROL_QP ".I"
@@ -146,6 +147,7 @@ void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, const AVCodec*, AVCode
 
 	obs_data_set_default_int(settings, ST_RATECONTROL_QUALITY_MINIMUM, 51);
 	obs_data_set_default_int(settings, ST_RATECONTROL_QUALITY_MAXIMUM, -1);
+	obs_data_set_default_int(settings, ST_RATECONTROL_QUALITY_TARGET, 0);
 
 	obs_data_set_default_int(settings, ST_RATECONTROL_QP_I, 21);
 	obs_data_set_default_int(settings, ST_RATECONTROL_QP_I_INITIAL, -1);
@@ -203,6 +205,8 @@ static bool modified_ratecontrol(obs_properties_t* props, obs_property_t*, obs_d
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QUALITY_MINIMUM), have_quality);
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QUALITY_MAXIMUM), have_quality);
 
+	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QUALITY_TARGET), have_quality);
+
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_I), have_qp);
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_P), have_qp);
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_B), have_qp);
@@ -246,7 +250,8 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, const AVCode
 		obs_properties_t* grp = props;
 		if (!obsffmpeg::are_property_groups_broken()) {
 			grp = obs_properties_create();
-			obs_properties_add_group(props, ST_RATECONTROL, TRANSLATE(ST_RATECONTROL), OBS_GROUP_NORMAL, grp);
+			obs_properties_add_group(props, ST_RATECONTROL, TRANSLATE(ST_RATECONTROL), OBS_GROUP_NORMAL,
+			                         grp);
 		}
 
 		{
@@ -342,6 +347,13 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, const AVCode
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_RATECONTROL_QUALITY_MAXIMUM)));
 		}
 	}
+
+	{
+		auto p = obs_properties_add_float_slider(props, ST_RATECONTROL_QUALITY_TARGET,
+		                                         TRANSLATE(ST_RATECONTROL_QUALITY_TARGET), 0, 100, 0.01);
+		obs_property_set_long_description(p, TRANSLATE(DESC(ST_RATECONTROL_QUALITY_TARGET)));
+	}
+
 	{
 		obs_properties_t* grp = props;
 		if (!obsffmpeg::are_property_groups_broken()) {
@@ -396,7 +408,8 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, const AVCode
 			obs_property_set_modified_callback(p, modified_aq);
 		}
 		{
-			auto p = obs_properties_add_int_slider(grp, ST_AQ_STRENGTH, TRANSLATE(ST_AQ_STRENGTH), 1, 15, 1);
+			auto p =
+			    obs_properties_add_int_slider(grp, ST_AQ_STRENGTH, TRANSLATE(ST_AQ_STRENGTH), 1, 15, 1);
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_AQ_STRENGTH)));
 		}
 		{
@@ -465,6 +478,7 @@ void obsffmpeg::nvenc::get_runtime_properties(obs_properties_t* props, const AVC
 	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QUALITY), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QUALITY_MINIMUM), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QUALITY_MAXIMUM), false);
+	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QUALITY_TARGET), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QP), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QP_I), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QP_I_INITIAL), false);
@@ -499,7 +513,7 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCode
 	{ // Rate Control
 		bool have_bitrate     = false;
 		bool have_bitrate_max = false;
-		bool have_quality_min = false;
+		bool have_quality     = false;
 		bool have_quality_max = false;
 		bool have_qp          = false;
 		bool have_qp_init     = false;
@@ -524,8 +538,7 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCode
 		case ratecontrolmode::VBR_HQ:
 			have_bitrate_max = true;
 			have_bitrate     = true;
-			have_quality_min = true;
-			have_quality_max = true;
+			have_quality     = true;
 			have_qp_init     = true;
 			break;
 		}
@@ -557,12 +570,19 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCode
 			context->rc_buffer_size =
 			    static_cast<int>(obs_data_get_int(settings, S_RATECONTROL_BUFFERSIZE) * 1000);
 
-		if (have_quality_min && obs_data_get_bool(settings, ST_RATECONTROL_QUALITY)) {
+		if (have_quality && obs_data_get_bool(settings, ST_RATECONTROL_QUALITY)) {
 			int qmin      = static_cast<int>(obs_data_get_int(settings, ST_RATECONTROL_QUALITY_MINIMUM));
 			context->qmin = qmin;
-			if ((qmin >= 0) && (have_quality_max)) {
+			if (qmin >= 0) {
 				context->qmax =
 				    static_cast<int>(obs_data_get_int(settings, ST_RATECONTROL_QUALITY_MAXIMUM));
+			}
+		}
+
+		{
+			double_t v = obs_data_get_double(settings, ST_RATECONTROL_QUALITY_TARGET) / 100.0 * 51.0;
+			if (v > 0) {
+				av_opt_set_double(context->priv_data, "cq", v, 0);
 			}
 		}
 
