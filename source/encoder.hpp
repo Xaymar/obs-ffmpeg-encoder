@@ -28,8 +28,8 @@
 #include "ffmpeg/swscale.hpp"
 
 extern "C" {
-#include <obs.h>
 #include <obs-properties.h>
+#include <obs.h>
 #pragma warning(push)
 #pragma warning(disable : 4244)
 #include <libavcodec/avcodec.h>
@@ -48,7 +48,7 @@ namespace obsffmpeg {
 		const AVCodec* avcodec_ptr;
 
 		public:
-		encoder_factory(const AVCodec * codec);
+		encoder_factory(const AVCodec* codec);
 		virtual ~encoder_factory();
 
 		void register_encoder();
@@ -63,19 +63,24 @@ namespace obsffmpeg {
 	};
 
 	class encoder {
-		obs_encoder_t*   self;
-		encoder_factory* factory;
+		obs_encoder_t*   _self;
+		encoder_factory* _factory;
 
-		const AVCodec*  codec;
-		AVCodecContext* context;
+		const AVCodec*  _codec;
+		AVCodecContext* _context;
 
-		ffmpeg::avframe_queue frame_queue;
-		ffmpeg::avframe_queue frame_queue_used;
-		ffmpeg::swscale       swscale;
-		AVPacket              current_packet;
+		ffmpeg::avframe_queue _frame_queue;
+		ffmpeg::avframe_queue _frame_queue_used;
+		ffmpeg::swscale       _swscale;
+		AVPacket              _current_packet;
 
-		int64_t lag_in_frames;
-		int64_t frame_count;
+		int64_t _lag_in_frames;
+		int64_t _count_send_frames;
+
+		// Extra Data
+		bool                 _have_first_frame;
+		std::vector<uint8_t> _extra_data;
+		std::vector<uint8_t> _sei_data;
 
 		public:
 		encoder(obs_data_t* settings, obs_encoder_t* encoder);
