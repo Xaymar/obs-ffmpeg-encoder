@@ -43,15 +43,12 @@ extern "C" {
 #pragma warning(pop)
 }
 
-// Generic
-#define P_AUTOMATIC "Automatic"
-
 // FFmpeg
-#define P_FFMPEG "FFmpeg"
-#define P_FFMPEG_CUSTOMSETTINGS "FFmpeg.CustomSettings"
-#define P_FFMPEG_THREADS "FFmpeg.Threads"
-#define P_FFMPEG_COLORFORMAT "FFmpeg.ColorFormat"
-#define P_FFMPEG_STANDARDCOMPLIANCE "FFmpeg.StandardCompliance"
+#define ST_FFMPEG "FFmpeg"
+#define ST_FFMPEG_CUSTOMSETTINGS "FFmpeg.CustomSettings"
+#define ST_FFMPEG_THREADS "FFmpeg.Threads"
+#define ST_FFMPEG_COLORFORMAT "FFmpeg.ColorFormat"
+#define ST_FFMPEG_STANDARDCOMPLIANCE "FFmpeg.StandardCompliance"
 
 enum class keyframe_type { SECONDS, FRAMES };
 
@@ -316,10 +313,10 @@ void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings)
 
 	{ // Integrated Options
 		// FFmpeg
-		obs_data_set_default_string(settings, P_FFMPEG_CUSTOMSETTINGS, "");
-		obs_data_set_default_int(settings, P_FFMPEG_COLORFORMAT, static_cast<int64_t>(AV_PIX_FMT_NONE));
-		obs_data_set_default_int(settings, P_FFMPEG_THREADS, 0);
-		obs_data_set_default_int(settings, P_FFMPEG_STANDARDCOMPLIANCE, FF_COMPLIANCE_STRICT);
+		obs_data_set_default_string(settings, ST_FFMPEG_CUSTOMSETTINGS, "");
+		obs_data_set_default_int(settings, ST_FFMPEG_COLORFORMAT, static_cast<int64_t>(AV_PIX_FMT_NONE));
+		obs_data_set_default_int(settings, ST_FFMPEG_THREADS, 0);
+		obs_data_set_default_int(settings, ST_FFMPEG_STANDARDCOMPLIANCE, FF_COMPLIANCE_STRICT);
 	}
 }
 
@@ -377,45 +374,46 @@ void obsffmpeg::encoder_factory::get_properties(obs_properties_t* props)
 		obs_properties_t* grp = props;
 		if (!obsffmpeg::are_property_groups_broken()) {
 			auto prs = obs_properties_create();
-			obs_properties_add_group(props, P_FFMPEG, TRANSLATE(P_FFMPEG), OBS_GROUP_NORMAL, prs);
+			obs_properties_add_group(props, ST_FFMPEG, TRANSLATE(ST_FFMPEG), OBS_GROUP_NORMAL, prs);
 			grp = prs;
 		}
 
 		{
 			auto p =
-			    obs_properties_add_text(grp, P_FFMPEG_CUSTOMSETTINGS, TRANSLATE(P_FFMPEG_CUSTOMSETTINGS),
+			    obs_properties_add_text(grp, ST_FFMPEG_CUSTOMSETTINGS, TRANSLATE(ST_FFMPEG_CUSTOMSETTINGS),
 			                            obs_text_type::OBS_TEXT_DEFAULT);
-			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_CUSTOMSETTINGS)));
+			obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_CUSTOMSETTINGS)));
 		}
 		if (this->avcodec_ptr->pix_fmts) {
-			auto p = obs_properties_add_list(grp, P_FFMPEG_COLORFORMAT, TRANSLATE(P_FFMPEG_COLORFORMAT),
+			auto p = obs_properties_add_list(grp, ST_FFMPEG_COLORFORMAT, TRANSLATE(ST_FFMPEG_COLORFORMAT),
 			                                 OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_COLORFORMAT)));
-			obs_property_list_add_int(p, TRANSLATE(P_AUTOMATIC), static_cast<int64_t>(AV_PIX_FMT_NONE));
+			obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_COLORFORMAT)));
+			obs_property_list_add_int(p, TRANSLATE(S_STATE_AUTOMATIC),
+			                          static_cast<int64_t>(AV_PIX_FMT_NONE));
 			for (auto ptr = this->avcodec_ptr->pix_fmts; *ptr != AV_PIX_FMT_NONE; ptr++) {
 				obs_property_list_add_int(p, ffmpeg::tools::get_pixel_format_name(*ptr),
 				                          static_cast<int64_t>(*ptr));
 			}
 		}
 		if (this->avcodec_ptr->capabilities & (AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_SLICE_THREADS)) {
-			auto p = obs_properties_add_int_slider(grp, P_FFMPEG_THREADS, TRANSLATE(P_FFMPEG_THREADS), 0,
+			auto p = obs_properties_add_int_slider(grp, ST_FFMPEG_THREADS, TRANSLATE(ST_FFMPEG_THREADS), 0,
 			                                       std::thread::hardware_concurrency() * 2, 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_THREADS)));
+			obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_THREADS)));
 		}
 		{
-			auto p = obs_properties_add_list(grp, P_FFMPEG_STANDARDCOMPLIANCE,
-			                                 TRANSLATE(P_FFMPEG_STANDARDCOMPLIANCE), OBS_COMBO_TYPE_LIST,
+			auto p = obs_properties_add_list(grp, ST_FFMPEG_STANDARDCOMPLIANCE,
+			                                 TRANSLATE(ST_FFMPEG_STANDARDCOMPLIANCE), OBS_COMBO_TYPE_LIST,
 			                                 OBS_COMBO_FORMAT_INT);
-			obs_property_set_long_description(p, TRANSLATE(DESC(P_FFMPEG_STANDARDCOMPLIANCE)));
-			obs_property_list_add_int(p, TRANSLATE(P_FFMPEG_STANDARDCOMPLIANCE ".VeryStrict"),
+			obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_STANDARDCOMPLIANCE)));
+			obs_property_list_add_int(p, TRANSLATE(ST_FFMPEG_STANDARDCOMPLIANCE ".VeryStrict"),
 			                          FF_COMPLIANCE_VERY_STRICT);
-			obs_property_list_add_int(p, TRANSLATE(P_FFMPEG_STANDARDCOMPLIANCE ".Strict"),
+			obs_property_list_add_int(p, TRANSLATE(ST_FFMPEG_STANDARDCOMPLIANCE ".Strict"),
 			                          FF_COMPLIANCE_STRICT);
-			obs_property_list_add_int(p, TRANSLATE(P_FFMPEG_STANDARDCOMPLIANCE ".Normal"),
+			obs_property_list_add_int(p, TRANSLATE(ST_FFMPEG_STANDARDCOMPLIANCE ".Normal"),
 			                          FF_COMPLIANCE_NORMAL);
-			obs_property_list_add_int(p, TRANSLATE(P_FFMPEG_STANDARDCOMPLIANCE ".Unofficial"),
+			obs_property_list_add_int(p, TRANSLATE(ST_FFMPEG_STANDARDCOMPLIANCE ".Unofficial"),
 			                          FF_COMPLIANCE_UNOFFICIAL);
-			obs_property_list_add_int(p, TRANSLATE(P_FFMPEG_STANDARDCOMPLIANCE ".Experimental"),
+			obs_property_list_add_int(p, TRANSLATE(ST_FFMPEG_STANDARDCOMPLIANCE ".Experimental"),
 			                          FF_COMPLIANCE_EXPERIMENTAL);
 		}
 	};
@@ -448,7 +446,7 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder)
 	// Settings
 	/// Rate Control
 	this->_context->strict_std_compliance =
-	    static_cast<int>(obs_data_get_int(settings, P_FFMPEG_STANDARDCOMPLIANCE));
+	    static_cast<int>(obs_data_get_int(settings, ST_FFMPEG_STANDARDCOMPLIANCE));
 	this->_context->debug = 0;
 	/// Threading
 	if (this->_codec->capabilities
@@ -459,7 +457,7 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder)
 		if (this->_codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
 			this->_context->thread_type |= FF_THREAD_SLICE;
 		}
-		int64_t threads = obs_data_get_int(settings, P_FFMPEG_THREADS);
+		int64_t threads = obs_data_get_int(settings, ST_FFMPEG_THREADS);
 		if (threads > 0) {
 			this->_context->thread_count = static_cast<int>(threads);
 			this->_lag_in_frames         = this->_context->thread_count;
@@ -553,7 +551,7 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder)
 			          ffmpeg::tools::get_pixel_format_name(source));
 		}
 		AVPixelFormat color_format_override =
-		    static_cast<AVPixelFormat>(obs_data_get_int(settings, P_FFMPEG_COLORFORMAT));
+		    static_cast<AVPixelFormat>(obs_data_get_int(settings, ST_FFMPEG_COLORFORMAT));
 		if (color_format_override != AV_PIX_FMT_NONE) {
 			// User specified override for color format.
 			this->_context->pix_fmt = color_format_override;
@@ -642,9 +640,9 @@ void obsffmpeg::encoder::get_properties(obs_properties_t* props)
 	obs_property_set_enabled(obs_properties_get(props, S_KEYFRAMES_INTERVAL_SECONDS), false);
 	obs_property_set_enabled(obs_properties_get(props, S_KEYFRAMES_INTERVAL_FRAMES), false);
 
-	obs_property_set_enabled(obs_properties_get(props, P_FFMPEG_COLORFORMAT), false);
-	obs_property_set_enabled(obs_properties_get(props, P_FFMPEG_THREADS), false);
-	obs_property_set_enabled(obs_properties_get(props, P_FFMPEG_STANDARDCOMPLIANCE), false);
+	obs_property_set_enabled(obs_properties_get(props, ST_FFMPEG_COLORFORMAT), false);
+	obs_property_set_enabled(obs_properties_get(props, ST_FFMPEG_THREADS), false);
+	obs_property_set_enabled(obs_properties_get(props, ST_FFMPEG_STANDARDCOMPLIANCE), false);
 }
 
 bool obsffmpeg::encoder::update(obs_data_t* settings)
@@ -678,7 +676,7 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 	{ // FFmpeg
 		// Apply custom options.
 		av_opt_set_from_string(this->_context->priv_data,
-		                       obs_data_get_string(settings, P_FFMPEG_CUSTOMSETTINGS), nullptr, "=", ";");
+		                       obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS), nullptr, "=", ";");
 	}
 	return false;
 }
@@ -700,7 +698,7 @@ void obsffmpeg::encoder::get_video_info(video_scale_info* vsi)
 	// Apply Video Format override.
 	{
 		obs_data_t*   settings  = obs_encoder_get_settings(this->_self);
-		AVPixelFormat format_av = static_cast<AVPixelFormat>(obs_data_get_int(settings, P_FFMPEG_COLORFORMAT));
+		AVPixelFormat format_av = static_cast<AVPixelFormat>(obs_data_get_int(settings, ST_FFMPEG_COLORFORMAT));
 		if (format_av != AV_PIX_FMT_NONE) {
 			video_format format_obs = ffmpeg::tools::avpixelformat_to_obs_videoformat(format_av);
 			if (format_obs != VIDEO_FORMAT_NONE) {
