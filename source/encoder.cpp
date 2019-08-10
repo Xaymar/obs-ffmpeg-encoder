@@ -1028,7 +1028,7 @@ int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_pac
 			}
 
 			std::memcpy(_current_packet.data, tmp_packet, sz_packet);
-			_current_packet.size = sz_packet;
+			_current_packet.size = static_cast<int>(sz_packet);
 
 			bfree(tmp_packet);
 			bfree(tmp_header);
