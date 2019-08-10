@@ -886,6 +886,7 @@ bool obsffmpeg::encoder::video_encode(encoder_frame* frame, encoder_packet* pack
 		vframe->format      = this->_context->pix_fmt;
 		vframe->color_range = this->_context->color_range;
 		vframe->colorspace  = this->_context->colorspace;
+		vframe->pts         = frame->pts;
 
 		if ((_swscale.is_source_full_range() == _swscale.is_target_full_range())
 		    && (_swscale.get_source_colorspace() == _swscale.get_target_colorspace())
@@ -924,9 +925,6 @@ bool obsffmpeg::encoder::video_encode(encoder_frame* frame, encoder_packet* pack
 #ifdef _DEBUG
 				ScopeProfiler profile_inner("send");
 #endif
-
-				vframe->pts = frame->pts;
-
 				int res = send_frame(vframe);
 				switch (res) {
 				case 0:
@@ -958,7 +956,6 @@ bool obsffmpeg::encoder::video_encode(encoder_frame* frame, encoder_packet* pack
 #ifdef _DEBUG
 				ScopeProfiler profile_inner("recieve");
 #endif
-
 				int res = receive_packet(received_packet, packet);
 				switch (res) {
 				case 0:
@@ -1006,34 +1003,33 @@ int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_pac
 {
 	int res = avcodec_receive_packet(this->_context, &this->_current_packet);
 	if (res == 0) {
-		// H.264: First frame contains extra data and sei data.
-		if ((!_have_first_frame) && (_codec->id == AV_CODEC_ID_H264)) {
-			// Stolen temporarily from obs-ffmpeg
-			uint8_t* tmp_packet;
-			uint8_t* tmp_header;
-			uint8_t* tmp_sei;
-			size_t   sz_packet, sz_header, sz_sei;
+		if (!_have_first_frame) {
+			if (_codec->id == AV_CODEC_ID_H264) {
+				uint8_t* tmp_packet;
+				uint8_t* tmp_header;
+				uint8_t* tmp_sei;
+				size_t   sz_packet, sz_header, sz_sei;
 
-			obs_extract_avc_headers(_current_packet.data, _current_packet.size, &tmp_packet, &sz_packet,
-			                        &tmp_header, &sz_header, &tmp_sei, &sz_sei);
+				obs_extract_avc_headers(_current_packet.data, _current_packet.size, &tmp_packet,
+				                        &sz_packet, &tmp_header, &sz_header, &tmp_sei, &sz_sei);
 
-			if (sz_header) {
-				_extra_data.resize(sz_header);
-				std::memcpy(_extra_data.data(), tmp_packet, _extra_data.size());
+				if (sz_header) {
+					_extra_data.resize(sz_header);
+					std::memcpy(_extra_data.data(), tmp_header, sz_header);
+				}
+
+				if (sz_sei) {
+					_sei_data.resize(sz_sei);
+					std::memcpy(_sei_data.data(), tmp_sei, sz_sei);
+				}
+
+				std::memcpy(_current_packet.data, tmp_packet, sz_packet);
+				_current_packet.size = static_cast<int>(sz_packet);
+
+				bfree(tmp_packet);
+				bfree(tmp_header);
+				bfree(tmp_sei);
 			}
-
-			if (sz_sei) {
-				_sei_data.resize(sz_sei);
-				std::memcpy(_sei_data.data(), tmp_sei, _sei_data.size());
-			}
-
-			std::memcpy(_current_packet.data, tmp_packet, sz_packet);
-			_current_packet.size = static_cast<int>(sz_packet);
-
-			bfree(tmp_packet);
-			bfree(tmp_header);
-			bfree(tmp_sei);
-
 			_have_first_frame = true;
 		}
 
