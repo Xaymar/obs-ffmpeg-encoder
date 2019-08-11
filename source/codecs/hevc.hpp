@@ -20,7 +20,7 @@
 // SOFTWARE.
 
 #pragma once
-#include <map>
+#include <vector>
 
 // Codec: HEVC
 #define P_HEVC "Codec.HEVC"
@@ -60,6 +60,10 @@ namespace obsffmpeg {
 				L6_2    = 186,
 				UNKNOWN = -1,
 			};
+
+			void extract_header_sei(uint8_t* data, size_t sz_data,
+			                        std::vector<uint8_t>& header, std::vector<uint8_t>& sei);
+
 		} // namespace hevc
 	}         // namespace codecs
 } // namespace obsffmpeg

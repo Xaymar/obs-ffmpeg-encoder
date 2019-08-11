@@ -29,6 +29,7 @@
 #include "plugin.hpp"
 #include "strings.hpp"
 #include "utility.hpp"
+#include "codecs/hevc.hpp"
 
 extern "C" {
 #include <obs-avc.h>
@@ -1029,6 +1030,9 @@ int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_pac
 				bfree(tmp_packet);
 				bfree(tmp_header);
 				bfree(tmp_sei);
+			} else if (_codec->id == AV_CODEC_ID_HEVC) {
+				obsffmpeg::codecs::hevc::extract_header_sei(_current_packet.data, _current_packet.size,
+				                                            _extra_data, _sei_data);
 			}
 			_have_first_frame = true;
 		}
