@@ -69,6 +69,10 @@ namespace obsffmpeg {
 		const AVCodec*  _codec;
 		AVCodecContext* _context;
 
+		bool                      _initialized;
+		std::pair<size_t, size_t> _resolution;
+		AVPixelFormat             _format;
+
 		ffmpeg::avframe_queue _frame_queue;
 		ffmpeg::avframe_queue _frame_queue_used;
 		ffmpeg::swscale       _swscale;
@@ -85,6 +89,8 @@ namespace obsffmpeg {
 		public:
 		encoder(obs_data_t* settings, obs_encoder_t* encoder);
 		virtual ~encoder();
+
+		bool initialize();
 
 		public: // OBS API
 		// Shared
