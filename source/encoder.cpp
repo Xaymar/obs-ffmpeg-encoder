@@ -44,6 +44,13 @@ extern "C" {
 #pragma warning(pop)
 }
 
+//#define DEBUG_CALL_ORDER
+// Call Order should be:
+// - create_texture/create
+// - get_video_info
+// - encode_texture/encode
+// I don't understand what get_video_info is actually for in this order, as this postpones initialization to encode...
+
 // FFmpeg
 #define ST_FFMPEG "FFmpeg"
 #define ST_FFMPEG_CUSTOMSETTINGS "FFmpeg.CustomSettings"
@@ -53,7 +60,226 @@ extern "C" {
 
 enum class keyframe_type { SECONDS, FRAMES };
 
-obsffmpeg::encoder_factory::encoder_factory(const AVCodec* codec) : avcodec_ptr(codec), info()
+static void* _create(obs_data_t* settings, obs_encoder_t* encoder) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, settings, encoder);
+#endif
+	return reinterpret_cast<void*>(new obsffmpeg::encoder(settings, encoder));
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return nullptr;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return nullptr;
+}
+
+static void* _create_texture(obs_data_t* settings, obs_encoder_t* encoder) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, settings, encoder);
+#endif
+	return reinterpret_cast<void*>(new obsffmpeg::encoder(settings, encoder, true));
+} catch (const obsffmpeg::unsupported_gpu_exception& ex) {
+	obsffmpeg::encoder_factory* fac =
+	    reinterpret_cast<obsffmpeg::encoder_factory*>(obs_encoder_get_type_data(encoder));
+	PLOG_WARNING("<%s> GPU not supported for hardware encoding, falling back to software.",
+	             fac->get_avcodec()->name);
+	return obs_encoder_create_rerouted(encoder, fac->get_fallback().oei.id);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return nullptr;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return nullptr;
+}
+
+static void _destroy(void* ptr) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX", __FUNCTION_NAME__, ptr);
+#endif
+	if (ptr)
+		delete reinterpret_cast<obsffmpeg::encoder*>(ptr);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+}
+
+static const char* _get_name(void* type_data) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX", __FUNCTION_NAME__, type_data);
+#endif
+	return reinterpret_cast<obsffmpeg::encoder_factory*>(type_data)->get_info().readable_name.c_str();
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return nullptr;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return nullptr;
+}
+
+static const char* _get_name_fallback(void* type_data) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX", __FUNCTION_NAME__, type_data);
+#endif
+	return reinterpret_cast<obsffmpeg::encoder_factory*>(type_data)->get_fallback().readable_name.c_str();
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return nullptr;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return nullptr;
+}
+
+static void _get_defaults(obs_data_t* settings, void* type_data) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, settings, type_data);
+#endif
+	reinterpret_cast<obsffmpeg::encoder_factory*>(type_data)->get_defaults(settings);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+};
+
+static obs_properties_t* _get_properties(void* ptr, void* type_data) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, ptr, type_data);
+#endif
+	obs_properties_t* props = obs_properties_create();
+	if (type_data != nullptr) {
+		reinterpret_cast<obsffmpeg::encoder_factory*>(type_data)->get_properties(props);
+	}
+	if (ptr != nullptr) {
+		reinterpret_cast<obsffmpeg::encoder*>(ptr)->get_properties(props);
+	}
+	return props;
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return reinterpret_cast<obs_properties_t*>(0);
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return reinterpret_cast<obs_properties_t*>(0);
+}
+
+static bool _update(void* ptr, obs_data_t* settings) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, ptr, settings);
+#endif
+	return reinterpret_cast<obsffmpeg::encoder*>(ptr)->update(settings);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return false;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return false;
+}
+
+static bool _get_sei_data(void* ptr, uint8_t** sei_data, size_t* size) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX %llX", __FUNCTION_NAME__, ptr, sei_data, size);
+#endif
+	return reinterpret_cast<obsffmpeg::encoder*>(ptr)->get_sei_data(sei_data, size);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return false;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return false;
+}
+
+static bool _get_extra_data(void* ptr, uint8_t** extra_data, size_t* size) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX %llX", __FUNCTION_NAME__, ptr, extra_data, size);
+#endif
+	return reinterpret_cast<obsffmpeg::encoder*>(ptr)->get_extra_data(extra_data, size);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return false;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return false;
+}
+
+static void _get_video_info(void* ptr, struct video_scale_info* info) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, ptr, info);
+#endif
+	reinterpret_cast<obsffmpeg::encoder*>(ptr)->get_video_info(info);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+}
+
+static bool _encode(void* ptr, struct encoder_frame* frame, struct encoder_packet* packet,
+                    bool* received_packet) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX %llX %llX", __FUNCTION_NAME__, ptr, frame, packet, received_packet);
+#endif
+	return reinterpret_cast<obsffmpeg::encoder*>(ptr)->video_encode(frame, packet, received_packet);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return false;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return false;
+}
+
+static bool _encode_texture(void* ptr, uint32_t handle, int64_t pts, uint64_t lock_key, uint64_t* next_key,
+                            struct encoder_packet* packet, bool* received_packet) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %lI %llI %llU %llX %llX %llX", __FUNCTION_NAME__, ptr, handle, pts, lock_key, next_key, packet,
+	          received_packet);
+#endif
+	return reinterpret_cast<obsffmpeg::encoder*>(ptr)->video_encode_texture(handle, pts, lock_key, next_key, packet,
+	                                                                        received_packet);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return false;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return false;
+}
+
+static void _get_audio_info(void* ptr, struct audio_convert_info* info) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, ptr, info);
+#endif
+	reinterpret_cast<obsffmpeg::encoder*>(ptr)->get_audio_info(info);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+}
+
+static size_t _get_frame_size(void* ptr) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX", __FUNCTION_NAME__, ptr);
+#endif
+	return reinterpret_cast<obsffmpeg::encoder*>(ptr)->get_frame_size();
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return 0;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return 0;
+}
+
+static bool _encode_audio(void* ptr, struct encoder_frame* frame, struct encoder_packet* packet,
+                          bool* received_packet) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX %llX %llX", __FUNCTION_NAME__, ptr, frame, packet, received_packet);
+#endif
+	return reinterpret_cast<obsffmpeg::encoder*>(ptr)->audio_encode(frame, packet, received_packet);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return false;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return false;
+}
+
+obsffmpeg::encoder_factory::encoder_factory(const AVCodec* codec) : avcodec_ptr(codec), info(), info_fallback()
 {
 	// Unique Id is FFmpeg name.
 	info.uid = avcodec_ptr->name;
@@ -96,6 +322,21 @@ obsffmpeg::encoder_factory::encoder_factory(const AVCodec* codec) : avcodec_ptr(
 		info.oei.caps |= OBS_ENCODER_CAP_DEPRECATED;
 	}
 #endif
+
+	// Hardware encoder?
+	if (ffmpeg::tools::can_hardware_encode(avcodec_ptr)) {
+		info_fallback.uid           = info.uid + "_sw";
+		info_fallback.codec         = info.codec;
+		info_fallback.readable_name = info.readable_name + " (Software)";
+
+		// Copy capabilities and hide from view.
+		info_fallback.oei.id    = info_fallback.uid.c_str();
+		info_fallback.oei.codec = info.oei.codec;
+		info_fallback.oei.caps  = info.oei.caps;
+		info_fallback.oei.caps |= OBS_ENCODER_CAP_DEPRECATED;
+
+		info.oei.caps |= OBS_ENCODER_CAP_PASS_TEXTURE;
+	}
 }
 
 obsffmpeg::encoder_factory::~encoder_factory() {}
@@ -112,188 +353,53 @@ void obsffmpeg::encoder_factory::register_encoder()
 	}
 
 	// Register functions.
-	info.oei.create = [](obs_data_t* settings, obs_encoder_t* encoder) {
-		try {
-			return reinterpret_cast<void*>(new obsffmpeg::encoder(settings, encoder));
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			return reinterpret_cast<void*>(0);
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			return reinterpret_cast<void*>(0);
-		}
-	};
-	info.oei.destroy = [](void* ptr) {
-		try {
-			delete reinterpret_cast<encoder*>(ptr);
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
-	info.oei.get_name = [](void* type_data) {
-		try {
-			return reinterpret_cast<encoder_factory*>(type_data)->get_name();
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
-	info.oei.get_defaults2 = [](obs_data_t* settings, void* type_data) {
-		try {
-			reinterpret_cast<encoder_factory*>(type_data)->get_defaults(settings);
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
-	info.oei.get_properties2 = [](void* ptr, void* type_data) {
-		try {
-			obs_properties_t* props = obs_properties_create();
-			if (type_data != nullptr) {
-				reinterpret_cast<encoder_factory*>(type_data)->get_properties(props);
-			}
-			if (ptr != nullptr) {
-				reinterpret_cast<encoder*>(ptr)->get_properties(props);
-			}
-			return props;
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
-	info.oei.update = [](void* ptr, obs_data_t* settings) {
-		try {
-			return reinterpret_cast<encoder*>(ptr)->update(settings);
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
-	info.oei.get_sei_data = [](void* ptr, uint8_t** sei_data, size_t* size) {
-		try {
-			return reinterpret_cast<encoder*>(ptr)->get_sei_data(sei_data, size);
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
-	info.oei.get_extra_data = [](void* ptr, uint8_t** extra_data, size_t* size) {
-		try {
-			return reinterpret_cast<encoder*>(ptr)->get_extra_data(extra_data, size);
-		} catch (std::exception const& e) {
-			PLOG_ERROR("exception: %s", e.what());
-			throw e;
-		} catch (...) {
-			PLOG_ERROR("unknown exception");
-			throw;
-		}
-	};
+	info.oei.destroy         = _destroy;
+	info.oei.get_name        = _get_name;
+	info.oei.get_defaults2   = _get_defaults;
+	info.oei.get_properties2 = _get_properties;
+	info.oei.update          = _update;
+	info.oei.get_sei_data    = _get_sei_data;
+	info.oei.get_extra_data  = _get_extra_data;
 
 	if (avcodec_ptr->type == AVMediaType::AVMEDIA_TYPE_VIDEO) {
-		info.oei.get_video_info = [](void* ptr, struct video_scale_info* info) {
-			try {
-				reinterpret_cast<encoder*>(ptr)->get_video_info(info);
-			} catch (std::exception const& e) {
-				PLOG_ERROR("exception: %s", e.what());
-				throw e;
-			} catch (...) {
-				PLOG_ERROR("unknown exception");
-				throw;
-			}
-		};
-		info.oei.encode = [](void* ptr, struct encoder_frame* frame, struct encoder_packet* packet,
-		                     bool* received_packet) {
-			try {
-				return reinterpret_cast<encoder*>(ptr)->video_encode(frame, packet, received_packet);
-			} catch (std::exception const& e) {
-				PLOG_ERROR("exception: %s", e.what());
-				throw e;
-			} catch (...) {
-				PLOG_ERROR("unknown exception");
-				throw;
-			}
-		};
-		info.oei.encode_texture = [](void* ptr, uint32_t handle, int64_t pts, uint64_t lock_key,
-		                             uint64_t* next_key, struct encoder_packet* packet, bool* received_packet) {
-			try {
-				return reinterpret_cast<encoder*>(ptr)->video_encode_texture(
-				    handle, pts, lock_key, next_key, packet, received_packet);
-			} catch (std::exception const& e) {
-				PLOG_ERROR("exception: %s", e.what());
-				throw e;
-			} catch (...) {
-				PLOG_ERROR("unknown exception");
-				throw;
-			}
-		};
-
+		info.oei.get_video_info = _get_video_info;
 	} else if (avcodec_ptr->type == AVMediaType::AVMEDIA_TYPE_AUDIO) {
-		info.oei.get_audio_info = [](void* ptr, struct audio_convert_info* info) {
-			try {
-				reinterpret_cast<encoder*>(ptr)->get_audio_info(info);
-			} catch (std::exception const& e) {
-				PLOG_ERROR("exception: %s", e.what());
-				throw e;
-			} catch (...) {
-				PLOG_ERROR("unknown exception");
-				throw;
-			}
-		};
-		info.oei.get_frame_size = [](void* ptr) {
-			try {
-				return reinterpret_cast<encoder*>(ptr)->get_frame_size();
-			} catch (std::exception const& e) {
-				PLOG_ERROR("exception: %s", e.what());
-				throw e;
-			} catch (...) {
-				PLOG_ERROR("unknown exception");
-				throw;
-			}
-		};
-		info.oei.encode = [](void* ptr, struct encoder_frame* frame, struct encoder_packet* packet,
-		                     bool* received_packet) {
-			try {
-				return reinterpret_cast<encoder*>(ptr)->audio_encode(frame, packet, received_packet);
-			} catch (std::exception const& e) {
-				PLOG_ERROR("exception: %s", e.what());
-				throw e;
-			} catch (...) {
-				PLOG_ERROR("unknown exception");
-				throw;
-			}
-		};
+		info.oei.get_audio_info = _get_audio_info;
+		info.oei.get_frame_size = _get_frame_size;
+		info.oei.encode         = _encode_audio;
 	}
 
 	// Finally store ourself as type data.
 	info.oei.type_data = this;
 
+	if (ffmpeg::tools::can_hardware_encode(avcodec_ptr)) {
+		info.oei.create         = _create_texture;
+		info.oei.encode_texture = _encode_texture;
+
+		info_fallback.oei.type            = info.oei.type;
+		info_fallback.oei.create          = _create;
+		info_fallback.oei.destroy         = _destroy;
+		info_fallback.oei.get_name        = _get_name_fallback;
+		info_fallback.oei.get_defaults2   = _get_defaults;
+		info_fallback.oei.get_properties2 = _get_properties;
+		info_fallback.oei.update          = _update;
+		info_fallback.oei.get_sei_data    = _get_sei_data;
+		info_fallback.oei.get_extra_data  = _get_extra_data;
+		info_fallback.oei.get_video_info  = _get_video_info;
+		info_fallback.oei.encode          = _encode;
+		info_fallback.oei.type_data       = this;
+
+		obs_register_encoder(&info_fallback.oei);
+		PLOG_DEBUG("Registered software fallback for encoder #%llX", avcodec_ptr);
+	} else {
+		// Is not a GPU Encoder, don't implement fallback.
+		info.oei.create = _create;
+		info.oei.encode = _encode;
+	}
+
 	obs_register_encoder(&info.oei);
 	PLOG_DEBUG("Registered encoder #%llX with name '%s' and long name '%s' and caps %llX", avcodec_ptr,
 	           avcodec_ptr->name, avcodec_ptr->long_name, avcodec_ptr->capabilities);
-}
-
-const char* obsffmpeg::encoder_factory::get_name()
-{
-	return info.readable_name.c_str();
 }
 
 void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings)
@@ -320,12 +426,17 @@ void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings)
 	}
 }
 
-static bool modified_keyframes(obs_properties_t* props, obs_property_t*, obs_data_t* settings)
-{
+static bool modified_keyframes(obs_properties_t* props, obs_property_t*, obs_data_t* settings) try {
 	bool is_seconds = obs_data_get_int(settings, S_KEYFRAMES_INTERVALTYPE) == 0;
 	obs_property_set_visible(obs_properties_get(props, S_KEYFRAMES_INTERVAL_FRAMES), !is_seconds);
 	obs_property_set_visible(obs_properties_get(props, S_KEYFRAMES_INTERVAL_SECONDS), is_seconds);
 	return true;
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return false;
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return false;
 }
 
 void obsffmpeg::encoder_factory::get_properties(obs_properties_t* props)
@@ -424,9 +535,23 @@ const AVCodec* obsffmpeg::encoder_factory::get_avcodec()
 	return avcodec_ptr;
 }
 
-obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder)
+const obsffmpeg::encoder_info& obsffmpeg::encoder_factory::get_info()
+{
+	return info;
+}
+
+const obsffmpeg::encoder_info& obsffmpeg::encoder_factory::get_fallback()
+{
+	return info_fallback;
+}
+
+obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool is_texture_encode)
     : _self(encoder), _lag_in_frames(0), _count_send_frames(0), _have_first_frame(false), _initialized(false)
 {
+	if (is_texture_encode) {
+		throw obsffmpeg::unsupported_gpu_exception("not implemented yet");
+	}
+
 	_factory = reinterpret_cast<encoder_factory*>(obs_encoder_get_type_data(_self));
 
 	// Verify that the codec actually still exists.
@@ -541,9 +666,8 @@ bool obsffmpeg::encoder::initialize()
 	if (res < 0) {
 		std::stringstream sstr;
 		sstr << "Failed to initalized encoder '" << _codec->name
-		     << "' due to error: " << ffmpeg::tools::get_error_description(res) << "(" << res
-		     << ")";
-		    throw std::runtime_error(sstr.str().c_str());
+		     << "' due to error: " << ffmpeg::tools::get_error_description(res) << "(" << res << ")";
+		throw std::runtime_error(sstr.str().c_str());
 	}
 
 	// Initialize Scaler and Frame Queue

@@ -38,13 +38,21 @@ extern "C" {
 }
 
 namespace obsffmpeg {
+	class unsupported_gpu_exception : public std::runtime_error {
+		public:
+		unsupported_gpu_exception(const std::string& reason) : runtime_error(reason) {}
+	};
+
+	struct encoder_info {
+		std::string      uid;
+		std::string      codec;
+		std::string      readable_name;
+		obs_encoder_info oei;
+	};
+
 	class encoder_factory {
-		struct info {
-			std::string      uid;
-			std::string      codec;
-			std::string      readable_name;
-			obs_encoder_info oei;
-		} info;
+		encoder_info   info;
+		encoder_info   info_fallback;
 		const AVCodec* avcodec_ptr;
 
 		public:
@@ -53,13 +61,15 @@ namespace obsffmpeg {
 
 		void register_encoder();
 
-		const char* get_name();
-
 		void get_defaults(obs_data_t* settings);
 
 		void get_properties(obs_properties_t* props);
 
 		const AVCodec* get_avcodec();
+
+		const encoder_info& get_info();
+
+		const encoder_info& get_fallback();
 	};
 
 	class encoder {
@@ -87,7 +97,7 @@ namespace obsffmpeg {
 		std::vector<uint8_t> _sei_data;
 
 		public:
-		encoder(obs_data_t* settings, obs_encoder_t* encoder);
+		encoder(obs_data_t* settings, obs_encoder_t* encoder, bool is_texture_encode = false);
 		virtual ~encoder();
 
 		bool initialize();
