@@ -235,3 +235,17 @@ AVColorRange ffmpeg::tools::obs_videorangetype_to_avcolorrange(video_range_type 
 	}
 	throw std::invalid_argument("unknown range");
 }
+
+bool ffmpeg::tools::can_hardware_encode(const AVCodec* codec)
+{
+	AVPixelFormat hardware_formats[] = {AV_PIX_FMT_D3D11};
+
+	for (const AVPixelFormat* fmt = codec->pix_fmts; (fmt != nullptr) && (*fmt != AV_PIX_FMT_NONE); fmt++) {
+		for (auto cmp : hardware_formats) {
+			if (*fmt == cmp) {
+				return true;
+			}
+		}
+	}
+	return false;
+}

@@ -28,6 +28,7 @@
 
 extern "C" {
 #include <libavutil/pixfmt.h>
+#include <libavcodec/avcodec.h>
 }
 
 namespace ffmpeg {
@@ -47,6 +48,8 @@ namespace ffmpeg {
 		AVColorSpace obs_videocolorspace_to_avcolorspace(video_colorspace v);
 
 		AVColorRange obs_videorangetype_to_avcolorrange(video_range_type v);
+
+		bool can_hardware_encode(const AVCodec* codec);
 	} // namespace tools
 } // namespace ffmpeg
 
