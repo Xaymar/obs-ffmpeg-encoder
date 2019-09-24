@@ -20,6 +20,8 @@
 // SOFTWARE.
 
 #include "tools.hpp"
+#include <list>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 
@@ -159,57 +161,47 @@ const char* ffmpeg::tools::get_error_description(int error)
 	return "Not Translated Yet";
 }
 
+static std::map<video_format, AVPixelFormat> obs_to_av_format_map = {
+    {VIDEO_FORMAT_I420, AV_PIX_FMT_YUV420P},  // YUV 4:2:0
+    {VIDEO_FORMAT_NV12, AV_PIX_FMT_NV12},     // NV12 Packed YUV
+    {VIDEO_FORMAT_YVYU, AV_PIX_FMT_YVYU422},  // YVYU Packed YUV
+    {VIDEO_FORMAT_YUY2, AV_PIX_FMT_YUYV422},  // YUYV Packed YUV
+    {VIDEO_FORMAT_UYVY, AV_PIX_FMT_UYVY422},  // UYVY Packed YUV
+    {VIDEO_FORMAT_RGBA, AV_PIX_FMT_RGBA},     //
+    {VIDEO_FORMAT_BGRA, AV_PIX_FMT_BGRA},     //
+    {VIDEO_FORMAT_BGRX, AV_PIX_FMT_BGR0},     //
+    {VIDEO_FORMAT_Y800, AV_PIX_FMT_GRAY8},    //
+    {VIDEO_FORMAT_I444, AV_PIX_FMT_YUV444P},  //
+    {VIDEO_FORMAT_BGR3, AV_PIX_FMT_BGR24},    //
+    {VIDEO_FORMAT_I422, AV_PIX_FMT_YUV422P},  //
+    {VIDEO_FORMAT_I40A, AV_PIX_FMT_YUVA420P}, //
+    {VIDEO_FORMAT_I42A, AV_PIX_FMT_YUVA422P}, //
+    {VIDEO_FORMAT_YUVA, AV_PIX_FMT_YUVA444P}, //
+                                              //{VIDEO_FORMAT_AYUV, AV_PIX_FMT_AYUV444P}, //
+};
+
 AVPixelFormat ffmpeg::tools::obs_videoformat_to_avpixelformat(video_format v)
 {
-	switch (v) {
-		// 32-Bits
-	case VIDEO_FORMAT_BGRX:
-		return AV_PIX_FMT_BGR0;
-	case VIDEO_FORMAT_BGRA:
-		return AV_PIX_FMT_BGRA;
-	case VIDEO_FORMAT_RGBA:
-		return AV_PIX_FMT_RGBA;
-	case VIDEO_FORMAT_I444:
-		return AV_PIX_FMT_YUV444P;
-	case VIDEO_FORMAT_YUY2:
-		return AV_PIX_FMT_YUYV422;
-	case VIDEO_FORMAT_YVYU:
-		return AV_PIX_FMT_YVYU422;
-	case VIDEO_FORMAT_UYVY:
-		return AV_PIX_FMT_UYVY422;
-	case VIDEO_FORMAT_I420:
-		return AV_PIX_FMT_YUV420P;
-	case VIDEO_FORMAT_NV12:
-		return AV_PIX_FMT_NV12;
+	auto found = obs_to_av_format_map.find(v);
+	if (found != obs_to_av_format_map.end()) {
+		return found->second;
 	}
-	throw std::invalid_argument("unknown format");
+	return AV_PIX_FMT_NONE;
 }
 
 video_format ffmpeg::tools::avpixelformat_to_obs_videoformat(AVPixelFormat v)
 {
-	switch (v) {
-	case AV_PIX_FMT_YUV420P:
-		return VIDEO_FORMAT_I420;
-	case AV_PIX_FMT_NV12:
-		return VIDEO_FORMAT_NV12;
-	case AV_PIX_FMT_YVYU422:
-		return VIDEO_FORMAT_YVYU;
-	case AV_PIX_FMT_YUYV422:
-		return VIDEO_FORMAT_YUY2;
-	case AV_PIX_FMT_UYVY422:
-		return VIDEO_FORMAT_UYVY;
-	case AV_PIX_FMT_RGBA:
-		return VIDEO_FORMAT_RGBA;
-	case AV_PIX_FMT_BGRA:
-		return VIDEO_FORMAT_BGRA;
-	case AV_PIX_FMT_BGR0:
-		return VIDEO_FORMAT_BGRX;
-	case AV_PIX_FMT_GRAY8:
-		return VIDEO_FORMAT_Y800;
-	case AV_PIX_FMT_YUV444P:
-		return VIDEO_FORMAT_I444;
+	for (const auto& kv : obs_to_av_format_map) {
+		if (kv.second == v)
+			return kv.first;
 	}
 	return VIDEO_FORMAT_NONE;
+}
+
+AVPixelFormat ffmpeg::tools::get_least_lossy_format(const AVPixelFormat* haystack, AVPixelFormat needle)
+{
+	int data_loss = 0;
+	return avcodec_find_best_pix_fmt_of_list(haystack, needle, 0, &data_loss);
 }
 
 AVColorSpace ffmpeg::tools::obs_videocolorspace_to_avcolorspace(video_colorspace v)
@@ -248,4 +240,141 @@ bool ffmpeg::tools::can_hardware_encode(const AVCodec* codec)
 		}
 	}
 	return false;
+}
+
+std::vector<AVPixelFormat> ffmpeg::tools::get_software_formats(const AVPixelFormat* list)
+{
+	AVPixelFormat hardware_formats[] = {
+#if FF_API_VAAPI
+		AV_PIX_FMT_VAAPI_MOCO,
+		AV_PIX_FMT_VAAPI_IDCT,
+#endif
+		AV_PIX_FMT_VAAPI,
+		AV_PIX_FMT_DXVA2_VLD,
+		AV_PIX_FMT_VDPAU,
+		AV_PIX_FMT_QSV,
+		AV_PIX_FMT_MMAL,
+		AV_PIX_FMT_D3D11VA_VLD,
+		AV_PIX_FMT_CUDA,
+		AV_PIX_FMT_XVMC,
+		AV_PIX_FMT_VIDEOTOOLBOX,
+		AV_PIX_FMT_MEDIACODEC,
+		AV_PIX_FMT_D3D11,
+		AV_PIX_FMT_OPENCL,
+	};
+
+	std::vector<AVPixelFormat> fmts;
+	for (auto fmt = list; fmt && (*fmt != AV_PIX_FMT_NONE); fmt++) {
+		bool is_blacklisted = false;
+		for (auto blacklisted : hardware_formats) {
+			if (*fmt == blacklisted)
+				is_blacklisted = true;
+		}
+		if (!is_blacklisted)
+			fmts.push_back(*fmt);
+	}
+
+	fmts.push_back(AV_PIX_FMT_NONE);
+
+	return std::move(fmts);
+}
+
+static std::map<std::pair<AVPixelFormat, AVPixelFormat>, double_t> format_compatibility = {
+    {{AV_PIX_FMT_NV12, AV_PIX_FMT_NV12}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_NV12, AV_PIX_FMT_NV21}, 65535.0},
+
+    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUVA420P}, 65535.0},
+    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P9}, 58981.5},
+    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P10}, 53083.35},
+    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P12}, 47775.015},
+    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P14}, 42997.5135},
+    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P16}, 38697.76215},
+
+    {{AV_PIX_FMT_YUVA420P, AV_PIX_FMT_YUVA420P}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_YUVA420P, AV_PIX_FMT_YUVA420P9}, 65535.0},
+    {{AV_PIX_FMT_YUVA420P, AV_PIX_FMT_YUVA420P10}, 58981.5},
+    {{AV_PIX_FMT_YUVA420P, AV_PIX_FMT_YUVA420P16}, 53083.35},
+    {{AV_PIX_FMT_YUVA420P, AV_PIX_FMT_YUV420P}, 32767.0},
+
+    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUVA422P}, 65535.0},
+    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P9}, 58981.5},
+    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P10}, 53083.35},
+    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P12}, 47775.015},
+    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P14}, 42997.5135},
+    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P16}, 38697.76215},
+
+    {{AV_PIX_FMT_YUVA422P, AV_PIX_FMT_YUVA422P}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA422P9}, 65535.0},
+    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA422P10}, 58981.5},
+    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA422P16}, 53083.35},
+    {{AV_PIX_FMT_YUVA422P, AV_PIX_FMT_YUV422P}, 32767.0},
+
+    {{AV_PIX_FMT_YVYU422, AV_PIX_FMT_YVYU422}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_YVYU422, AV_PIX_FMT_YUYV422}, 65535.0},
+
+    {{AV_PIX_FMT_UYVY422, AV_PIX_FMT_UYVY422}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_UYVY422, AV_PIX_FMT_YVYU422}, 65535.0},
+
+    {{AV_PIX_FMT_YUYV422, AV_PIX_FMT_YUYV422}, std::numeric_limits<double_t>::max()},
+
+    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUVA444P}, 65535.0},
+    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P9}, 58981.5},
+    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P10}, 53083.35},
+    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P12}, 47775.015},
+    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P14}, 42997.5135},
+    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P16}, 38697.76215},
+
+    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA444P}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA444P9}, 65535.0},
+    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA444P10}, 58981.5},
+    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA444P16}, 53083.35},
+    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUV444P}, 32767.0},
+
+    {{AV_PIX_FMT_RGBA, AV_PIX_FMT_RGBA}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_RGBA, AV_PIX_FMT_RGB0}, 65535.0},
+    {{AV_PIX_FMT_RGBA, AV_PIX_FMT_0RGB}, 32767.0},
+    {{AV_PIX_FMT_RGBA, AV_PIX_FMT_RGB24}, 16384.0},
+
+    {{AV_PIX_FMT_BGRA, AV_PIX_FMT_BGRA}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_BGRA, AV_PIX_FMT_BGR0}, 65535.0},
+    {{AV_PIX_FMT_BGRA, AV_PIX_FMT_0BGR}, 32767.0},
+    {{AV_PIX_FMT_BGRA, AV_PIX_FMT_BGR24}, 16384.0},
+
+    {{AV_PIX_FMT_BGR0, AV_PIX_FMT_BGR0}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_BGR0, AV_PIX_FMT_BGRA}, 65535.0},
+    {{AV_PIX_FMT_BGR0, AV_PIX_FMT_BGR24}, 32767.0},
+
+    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY8}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY9}, 65535.0},
+    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY10}, 58981.5},
+    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY12}, 53083.35},
+    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY14}, 47775.015},
+    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY16}, 42997.5135},
+
+    {{AV_PIX_FMT_BGR24, AV_PIX_FMT_BGR24}, std::numeric_limits<double_t>::max()},
+    {{AV_PIX_FMT_BGR24, AV_PIX_FMT_RGB24}, 32767.0},
+};
+
+AVPixelFormat ffmpeg::tools::get_best_compatible_format(const AVPixelFormat* list, AVPixelFormat source)
+{
+	double_t      score = std::numeric_limits<double_t>::min();
+	AVPixelFormat best  = source;
+
+	for (auto fmt = list; fmt && (*fmt != AV_PIX_FMT_NONE); fmt++) {
+		auto found = format_compatibility.find(std::pair{source, *fmt});
+		if (found != format_compatibility.end()) {
+			score = found->second;
+			best  = *fmt;
+		}
+	}
+
+	if (score <= 0) {
+		int data_loss = 0;
+		return avcodec_find_best_pix_fmt_of_list(list, source, 0, &data_loss);
+	}
+
+	return best;
 }

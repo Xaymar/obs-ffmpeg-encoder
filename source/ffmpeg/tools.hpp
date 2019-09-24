@@ -25,6 +25,7 @@
 
 #include <obs.h>
 #include <string>
+#include <vector>
 
 extern "C" {
 #include <libavutil/pixfmt.h>
@@ -45,11 +46,17 @@ namespace ffmpeg {
 
 		video_format avpixelformat_to_obs_videoformat(AVPixelFormat v);
 
+		AVPixelFormat get_least_lossy_format(const AVPixelFormat* haystack, AVPixelFormat needle);
+
 		AVColorSpace obs_videocolorspace_to_avcolorspace(video_colorspace v);
 
 		AVColorRange obs_videorangetype_to_avcolorrange(video_range_type v);
 
 		bool can_hardware_encode(const AVCodec* codec);
+
+		std::vector<AVPixelFormat> get_software_formats(const AVPixelFormat* list);
+
+		AVPixelFormat get_best_compatible_format(const AVPixelFormat* list, AVPixelFormat source);
 	} // namespace tools
 } // namespace ffmpeg
 
