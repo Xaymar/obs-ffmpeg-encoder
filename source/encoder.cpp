@@ -333,7 +333,7 @@ obsffmpeg::encoder_factory::encoder_factory(const AVCodec* codec) : avcodec_ptr(
 		info_fallback.oei.id    = info_fallback.uid.c_str();
 		info_fallback.oei.codec = info.oei.codec;
 		info_fallback.oei.caps  = info.oei.caps;
-		info_fallback.oei.caps |= OBS_ENCODER_CAP_DEPRECATED;
+		//info_fallback.oei.caps |= OBS_ENCODER_CAP_DEPRECATED;
 
 		info.oei.caps |= OBS_ENCODER_CAP_PASS_TEXTURE;
 	}
@@ -546,7 +546,7 @@ const obsffmpeg::encoder_info& obsffmpeg::encoder_factory::get_fallback()
 }
 
 obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool is_texture_encode)
-    : _self(encoder), _lag_in_frames(0), _count_send_frames(0), _have_first_frame(false), _initialized(false)
+    : _self(encoder), _lag_in_frames(0), _count_send_frames(0), _have_first_frame(false)
 {
 	if (is_texture_encode) {
 		throw obsffmpeg::unsupported_gpu_exception("not implemented yet");
@@ -594,8 +594,86 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 	// Update settings
 	update(settings);
 
+	// Create 8MB of precached Packet data for use later on.
 	av_init_packet(&_current_packet);
 	av_new_packet(&_current_packet, 8 * 1024 * 1024); // 8 MB precached Packet size.
+
+	if (_codec->type == AVMEDIA_TYPE_VIDEO) {
+		// Initialize Video Encoding
+		auto voi = video_output_get_info(obs_encoder_video(_self));
+
+		// Find a suitable Pixel Format.
+		AVPixelFormat _pixfmt_source = ffmpeg::tools::obs_videoformat_to_avpixelformat(voi->format);
+		AVPixelFormat _pixfmt_target =
+		    static_cast<AVPixelFormat>(obs_data_get_int(settings, ST_FFMPEG_COLORFORMAT));
+		if (_pixfmt_target == AV_PIX_FMT_NONE) {
+			// Find the best conversion format.
+			std::vector<AVPixelFormat> fmts = ffmpeg::tools::get_software_formats(_codec->pix_fmts);
+			_pixfmt_target = ffmpeg::tools::get_best_compatible_format(fmts.data(), _pixfmt_source);
+		} else {
+			// Use user override, guaranteed to be supported.
+			bool is_format_supported = false;
+			for (auto ptr = _codec->pix_fmts; *ptr != AV_PIX_FMT_NONE; ptr++) {
+				if (*ptr == _pixfmt_target) {
+					is_format_supported = true;
+				}
+			}
+
+			if (!is_format_supported) {
+				std::stringstream sstr;
+				sstr << "Color Format '" << ffmpeg::tools::get_pixel_format_name(_pixfmt_target)
+				     << "' is not supported by the encoder.";
+				throw std::exception(sstr.str().c_str());
+			}
+		}
+
+		_context->width                   = voi->width;
+		_context->height                  = voi->height;
+		_context->colorspace              = ffmpeg::tools::obs_videocolorspace_to_avcolorspace(voi->colorspace);
+		_context->color_range             = ffmpeg::tools::obs_videorangetype_to_avcolorrange(voi->range);
+		_context->pix_fmt                 = _pixfmt_target;
+		_context->field_order             = AV_FIELD_PROGRESSIVE;
+		_context->time_base.num           = voi->fps_den;
+		_context->time_base.den           = voi->fps_num;
+		_context->ticks_per_frame         = 1;
+		_context->sample_aspect_ratio.num = _context->sample_aspect_ratio.den = 1;
+
+		_swscale.set_source_size(_context->width, _context->height);
+		_swscale.set_source_color(_context->color_range, _context->colorspace);
+		_swscale.set_source_full_range(voi->range == VIDEO_RANGE_FULL);
+		_swscale.set_source_format(_pixfmt_source);
+
+		_swscale.set_target_size(_context->width, _context->height);
+		_swscale.set_target_color(_context->color_range, _context->colorspace);
+		_swscale.set_target_full_range(voi->range == VIDEO_RANGE_FULL);
+		_swscale.set_target_format(_pixfmt_target);
+
+		// Create Scaler
+		if (!_swscale.initialize(SWS_POINT)) {
+			std::stringstream sstr;
+			sstr << "Initializing scaler failed for conversion from '"
+			     << ffmpeg::tools::get_pixel_format_name(_swscale.get_source_format()) << "' to '"
+			     << ffmpeg::tools::get_pixel_format_name(_swscale.get_target_format())
+			     << "' with color space '"
+			     << ffmpeg::tools::get_color_space_name(_swscale.get_source_colorspace()) << "' and "
+			     << (_swscale.is_source_full_range() ? "full" : "partial") << " range.";
+			throw std::runtime_error(sstr.str());
+		}
+	}
+
+	// Initialize Encoder
+	int res = avcodec_open2(_context, _codec, NULL);
+	if (res < 0) {
+		std::stringstream sstr;
+		sstr << "Initializing encoder '" << _codec->name
+		     << "' failed with error: " << ffmpeg::tools::get_error_description(res) << " (code " << res << ")";
+		throw std::runtime_error(sstr.str());
+	}
+
+	// Create Frame queue
+	_frame_queue.set_pixel_format(_context->pix_fmt);
+	_frame_queue.set_resolution(_context->width, _context->height);
+	_frame_queue.precache(2);
 }
 
 obsffmpeg::encoder::~encoder()
@@ -620,84 +698,6 @@ obsffmpeg::encoder::~encoder()
 	_frame_queue.clear();
 	_frame_queue_used.clear();
 	_swscale.finalize();
-}
-
-bool obsffmpeg::encoder::initialize()
-{
-	if (_initialized)
-		return true;
-
-	// Detect supported
-	bool is_format_supported = false;
-	for (auto ptr = _codec->pix_fmts; *ptr != AV_PIX_FMT_NONE; ptr++) {
-		if (*ptr == _format) {
-			is_format_supported = true;
-		}
-	}
-	if (!is_format_supported) {
-		std::stringstream sstr;
-		sstr << "The color format " << ffmpeg::tools::get_pixel_format_name(_format)
-		     << " is not supported by the encoder.";
-		throw std::exception(sstr.str().c_str());
-	}
-
-	if (_codec->type == AVMEDIA_TYPE_VIDEO) {
-		auto encvideo = obs_encoder_video(_self);
-		auto voi      = video_output_get_info(encvideo);
-
-		// Set Resolution
-		_context->width  = static_cast<int>(_resolution.first);
-		_context->height = static_cast<int>(_resolution.second);
-
-		// Set Color Space, Format and Range
-		_context->colorspace  = ffmpeg::tools::obs_videocolorspace_to_avcolorspace(voi->colorspace);
-		_context->color_range = ffmpeg::tools::obs_videorangetype_to_avcolorrange(voi->range);
-		_context->pix_fmt     = _format;
-
-		// Set Framerate and Field Order
-		_context->field_order     = AV_FIELD_PROGRESSIVE;
-		_context->time_base.num   = voi->fps_den;
-		_context->time_base.den   = voi->fps_num;
-		_context->ticks_per_frame = 1;
-	}
-
-	// Initialize
-	int res = avcodec_open2(_context, _codec, NULL);
-	if (res < 0) {
-		std::stringstream sstr;
-		sstr << "Failed to initalized encoder '" << _codec->name
-		     << "' due to error: " << ffmpeg::tools::get_error_description(res) << "(" << res << ")";
-		throw std::runtime_error(sstr.str().c_str());
-	}
-
-	// Initialize Scaler and Frame Queue
-	if (_codec->type == AVMEDIA_TYPE_VIDEO) {
-		_swscale.set_source_format(_format);
-		_swscale.set_target_format(_context->pix_fmt);
-		_swscale.set_target_size(_context->width, _context->height);
-		_swscale.set_source_size(_context->width, _context->height);
-		_swscale.set_target_size(_context->width, _context->height);
-		_swscale.set_source_color(_context->color_range, _context->colorspace);
-		_swscale.set_target_color(_context->color_range, _context->colorspace);
-
-		// Create Scaler
-		if (!_swscale.initialize(SWS_FAST_BILINEAR)) {
-			std::stringstream sstr;
-			sstr << "Failed to initialize frame scaler for pixel format '"
-			     << ffmpeg::tools::get_pixel_format_name(_context->pix_fmt) << "' with color space '"
-			     << ffmpeg::tools::get_color_space_name(_context->colorspace) << "' and "
-			     << (_swscale.is_source_full_range() ? "full" : "partial") << " color range.";
-			throw std::runtime_error(sstr.str().c_str());
-		}
-
-		// Create Frame queue
-		_frame_queue.set_pixel_format(_context->pix_fmt);
-		_frame_queue.set_resolution(_context->width, _context->height);
-		_frame_queue.precache(2);
-	}
-
-	_initialized = true;
-	return true;
 }
 
 void obsffmpeg::encoder::get_properties(obs_properties_t* props)
@@ -769,18 +769,9 @@ bool obsffmpeg::encoder::audio_encode(encoder_frame*, encoder_packet*, bool*)
 
 void obsffmpeg::encoder::get_video_info(video_scale_info* vsi)
 {
-	obs_data_t* settings = obs_encoder_get_settings(_self);
-
-	AVPixelFormat avformat  = static_cast<AVPixelFormat>(obs_data_get_int(settings, ST_FFMPEG_COLORFORMAT));
-	video_format  obsformat = ffmpeg::tools::avpixelformat_to_obs_videoformat(avformat);
-
-	if (obsformat != VIDEO_FORMAT_NONE) {
-		vsi->format = obsformat;
-	}
-
-	_resolution.first  = vsi->width;
-	_resolution.second = vsi->height;
-	_format            = ffmpeg::tools::obs_videoformat_to_avpixelformat(vsi->format);
+	vsi->width  = _swscale.get_source_width();
+	vsi->height = _swscale.get_source_height();
+	vsi->format = ffmpeg::tools::avpixelformat_to_obs_videoformat(_swscale.get_source_format());
 }
 
 bool obsffmpeg::encoder::get_sei_data(uint8_t** data, size_t* size)
@@ -835,15 +826,6 @@ static inline void copy_data(encoder_frame* frame, AVFrame* vframe)
 
 bool obsffmpeg::encoder::video_encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
 {
-	// Ensure that the encoder was initialized.
-	try {
-		if (!initialize())
-			return false;
-	} catch (std::exception& ex) {
-		PLOG_ERROR("%s", ex.what());
-		return false;
-	}
-
 	// Convert frame.
 	std::shared_ptr<AVFrame> vframe = _frame_queue.pop(); // Retrieve an empty frame.
 	{
