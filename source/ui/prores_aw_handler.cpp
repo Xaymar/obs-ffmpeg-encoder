@@ -104,3 +104,11 @@ void obsffmpeg::ui::prores_aw_handler::update(obs_data_t* settings, const AVCode
 {
 	context->profile = static_cast<int>(obs_data_get_int(settings, P_PRORES_PROFILE));
 }
+
+void obsffmpeg::ui::prores_aw_handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
+{
+	for (auto ptr = codec->profiles; ptr->profile != FF_PROFILE_UNKNOWN; ptr++) {
+		if (ptr->profile == static_cast<int>(obs_data_get_int(settings, P_PRORES_PROFILE)))
+			PLOG_INFO("[%s]   Profile: %s", codec->name, ptr->name);
+	}
+}

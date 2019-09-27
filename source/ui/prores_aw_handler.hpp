@@ -45,6 +45,9 @@ namespace obsffmpeg {
 
 			virtual void update(obs_data_t* settings, const AVCodec* codec,
 			                    AVCodecContext* context) override;
+
+			virtual void log_options(obs_data_t* settings, const AVCodec* codec,
+			                         AVCodecContext* context) override;
 		};
 	} // namespace ui
 } // namespace obsffmpeg
