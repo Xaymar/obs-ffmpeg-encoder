@@ -25,6 +25,7 @@
 #include <sstream>
 #include <thread>
 #include <util/profiler.hpp>
+#include <vector>
 #include "codecs/hevc.hpp"
 #include "ffmpeg/tools.hpp"
 #include "plugin.hpp"

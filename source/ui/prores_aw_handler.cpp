@@ -20,19 +20,13 @@
 // SOFTWARE.
 
 #include "prores_aw_handler.hpp"
+#include "codecs/prores.hpp"
 #include "plugin.hpp"
 #include "utility.hpp"
 
 extern "C" {
 #include <obs-module.h>
 }
-
-#define P_PROFILE "AppleProRes.Profile"
-#define P_PROFILE_APCO "AppleProRes.Profile.APCO"
-#define P_PROFILE_APCS "AppleProRes.Profile.APCS"
-#define P_PROFILE_APCN "AppleProRes.Profile.APCN"
-#define P_PROFILE_APCH "AppleProRes.Profile.APCH"
-#define P_PROFILE_AP4H "AppleProRes.Profile.AP4H"
 
 INITIALIZER(prores_aw_handler_init)
 {
@@ -41,44 +35,72 @@ INITIALIZER(prores_aw_handler_init)
 	});
 };
 
+void obsffmpeg::ui::prores_aw_handler::override_colorformat(AVPixelFormat& target_format, obs_data_t* settings,
+                                                            const AVCodec* codec, AVCodecContext* context)
+{
+	std::string profile = "";
+
+	int profile_id = static_cast<int>(obs_data_get_int(settings, P_PRORES_PROFILE));
+	for (auto ptr = codec->profiles; ptr->profile != FF_PROFILE_UNKNOWN; ptr++) {
+		if (ptr->profile == profile_id) {
+			profile = ptr->name;
+			break;
+		}
+	}
+
+	std::unordered_map<AVPixelFormat, std::list<std::string>> valid_formats = {
+	    {AV_PIX_FMT_YUV422P10, {"apco", "apcs", "apcn", "apch"}}, {AV_PIX_FMT_YUV444P10, {"ap4h", "ap4x"}}};
+
+	for (auto kv : valid_formats) {
+		for (auto name : kv.second) {
+			if (profile == name) {
+				target_format = kv.first;
+			}
+		}
+	}
+}
+
 void obsffmpeg::ui::prores_aw_handler::get_defaults(obs_data_t* settings, const AVCodec*, AVCodecContext*)
 {
-	obs_data_set_default_int(settings, P_PROFILE, 0);
+	obs_data_set_default_int(settings, P_PRORES_PROFILE, 0);
 }
 
 void obsffmpeg::ui::prores_aw_handler::get_properties(obs_properties_t* props, const AVCodec* codec,
                                                       AVCodecContext* context)
 {
 	if (!context) {
-		auto p = obs_properties_add_list(props, P_PROFILE, TRANSLATE(P_PROFILE), OBS_COMBO_TYPE_LIST,
-		                                 OBS_COMBO_FORMAT_INT);
-		obs_property_set_long_description(p, TRANSLATE(DESC(P_PROFILE)));
+		auto p = obs_properties_add_list(props, P_PRORES_PROFILE, TRANSLATE(P_PRORES_PROFILE),
+		                                 OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+		obs_property_set_long_description(p, TRANSLATE(DESC(P_PRORES_PROFILE)));
 		for (auto ptr = codec->profiles; ptr->profile != FF_PROFILE_UNKNOWN; ptr++) {
 			if (strcmp("apco", ptr->name) == 0) {
-				obs_property_list_add_int(p, TRANSLATE(P_PROFILE_APCO),
+				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_APCO),
 				                          static_cast<int64_t>(ptr->profile));
 			} else if (strcmp("apcs", ptr->name) == 0) {
-				obs_property_list_add_int(p, TRANSLATE(P_PROFILE_APCS),
+				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_APCS),
 				                          static_cast<int64_t>(ptr->profile));
 			} else if (strcmp("apcn", ptr->name) == 0) {
-				obs_property_list_add_int(p, TRANSLATE(P_PROFILE_APCN),
+				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_APCN),
 				                          static_cast<int64_t>(ptr->profile));
 			} else if (strcmp("apch", ptr->name) == 0) {
-				obs_property_list_add_int(p, TRANSLATE(P_PROFILE_APCH),
+				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_APCH),
 				                          static_cast<int64_t>(ptr->profile));
 			} else if (strcmp("ap4h", ptr->name) == 0) {
-				obs_property_list_add_int(p, TRANSLATE(P_PROFILE_AP4H),
+				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_AP4H),
+				                          static_cast<int64_t>(ptr->profile));
+			} else if (strcmp("ap4x", ptr->name) == 0) {
+				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_AP4X),
 				                          static_cast<int64_t>(ptr->profile));
 			} else {
 				obs_property_list_add_int(p, ptr->name, ptr->profile);
 			}
 		}
 	} else {
-		obs_property_set_enabled(obs_properties_get(props, P_PROFILE), false);
+		obs_property_set_enabled(obs_properties_get(props, P_PRORES_PROFILE), false);
 	}
 }
 
 void obsffmpeg::ui::prores_aw_handler::update(obs_data_t* settings, const AVCodec*, AVCodecContext* context)
 {
-	context->profile = static_cast<int>(obs_data_get_int(settings, P_PROFILE));
+	context->profile = static_cast<int>(obs_data_get_int(settings, P_PRORES_PROFILE));
 }

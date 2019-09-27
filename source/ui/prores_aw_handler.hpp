@@ -34,6 +34,9 @@ namespace obsffmpeg {
 	namespace ui {
 		class prores_aw_handler : public handler {
 			public:
+			virtual void override_colorformat(AVPixelFormat& target_format, obs_data_t* settings,
+			                                  const AVCodec* codec, AVCodecContext* context) override;
+
 			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec,
 			                          AVCodecContext* context) override;
 
