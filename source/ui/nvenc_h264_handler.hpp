@@ -45,6 +45,9 @@ namespace obsffmpeg {
 			virtual void update(obs_data_t* settings, const AVCodec* codec,
 			                    AVCodecContext* context) override;
 
+			virtual void log_options(obs_data_t* settings, const AVCodec* codec,
+			                         AVCodecContext* context) override;
+
 			private:
 			void get_encoder_properties(obs_properties_t* props, const AVCodec* codec);
 

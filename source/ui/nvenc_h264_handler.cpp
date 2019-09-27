@@ -57,6 +57,7 @@ Useless except for strict_gop maybe?
 */
 
 using namespace obsffmpeg::codecs::h264;
+using namespace obsffmpeg::nvenc;
 
 std::map<profile, std::string> profiles{
     {profile::BASELINE, "baseline"},
@@ -123,6 +124,22 @@ void obsffmpeg::ui::nvenc_h264_handler::update(obs_data_t* settings, const AVCod
 			av_opt_set(context->priv_data, "level", "auto", 0);
 		}
 	}
+}
+
+void obsffmpeg::ui::nvenc_h264_handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
+{
+	nvenc::log_options(settings, codec, context);
+
+	profile cfg_profile = static_cast<profile>(obs_data_get_int(settings, P_H264_PROFILE));
+	level   cfg_level   = static_cast<level>(obs_data_get_int(settings, P_H264_LEVEL));
+
+	auto found1 = profiles.find(cfg_profile);
+	if (found1 != profiles.end())
+		PLOG_INFO("[%s]   H.264 Profile: %s", codec->name, found1->second.c_str());
+
+	auto found2 = levels.find(cfg_level);
+	if (found2 != levels.end())
+		PLOG_INFO("[%s]   H.264 Level: %s", codec->name, found2->second.c_str());
 }
 
 void obsffmpeg::ui::nvenc_h264_handler::get_encoder_properties(obs_properties_t* props, const AVCodec* codec)

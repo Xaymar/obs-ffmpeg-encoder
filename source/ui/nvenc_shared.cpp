@@ -57,7 +57,7 @@ extern "C" {
 #define ST_RATECONTROL_QP_I ST_RATECONTROL_QP ".I"
 #define ST_RATECONTROL_QP_I_INITIAL ST_RATECONTROL_QP_I ".Initial"
 #define ST_RATECONTROL_QP_P ST_RATECONTROL_QP ".P"
-#define ST_RATECONTROL_QP_ST_INITIAL ST_RATECONTROL_QP_P ".Initial"
+#define ST_RATECONTROL_QP_P_INITIAL ST_RATECONTROL_QP_P ".Initial"
 #define ST_RATECONTROL_QP_B ST_RATECONTROL_QP ".B"
 #define ST_RATECONTROL_QP_B_INITIAL ST_RATECONTROL_QP_B ".Initial"
 
@@ -152,7 +152,7 @@ void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, const AVCodec*, AVCode
 	obs_data_set_default_int(settings, ST_RATECONTROL_QP_I, 21);
 	obs_data_set_default_int(settings, ST_RATECONTROL_QP_I_INITIAL, -1);
 	obs_data_set_default_int(settings, ST_RATECONTROL_QP_P, 21);
-	obs_data_set_default_int(settings, ST_RATECONTROL_QP_ST_INITIAL, -1);
+	obs_data_set_default_int(settings, ST_RATECONTROL_QP_P_INITIAL, -1);
 	obs_data_set_default_int(settings, ST_RATECONTROL_QP_B, 21);
 	obs_data_set_default_int(settings, ST_RATECONTROL_QP_B_INITIAL, -1);
 
@@ -211,7 +211,7 @@ static bool modified_ratecontrol(obs_properties_t* props, obs_property_t*, obs_d
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_P), have_qp);
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_B), have_qp);
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_I_INITIAL), have_qp_init);
-	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_ST_INITIAL), have_qp_init);
+	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_P_INITIAL), have_qp_init);
 	obs_property_set_visible(obs_properties_get(props, ST_RATECONTROL_QP_B_INITIAL), have_qp_init);
 
 	return true;
@@ -379,9 +379,9 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, const AVCode
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_RATECONTROL_QP_P)));
 		}
 		{
-			auto p = obs_properties_add_int_slider(grp, ST_RATECONTROL_QP_ST_INITIAL,
-			                                       TRANSLATE(ST_RATECONTROL_QP_ST_INITIAL), -1, 51, 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(ST_RATECONTROL_QP_ST_INITIAL)));
+			auto p = obs_properties_add_int_slider(grp, ST_RATECONTROL_QP_P_INITIAL,
+			                                       TRANSLATE(ST_RATECONTROL_QP_P_INITIAL), -1, 51, 1);
+			obs_property_set_long_description(p, TRANSLATE(DESC(ST_RATECONTROL_QP_P_INITIAL)));
 		}
 		{
 			auto p = obs_properties_add_int_slider(grp, ST_RATECONTROL_QP_B, TRANSLATE(ST_RATECONTROL_QP_B),
@@ -483,7 +483,7 @@ void obsffmpeg::nvenc::get_runtime_properties(obs_properties_t* props, const AVC
 	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QP_I), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QP_I_INITIAL), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QP_P), false);
-	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QP_ST_INITIAL), false);
+	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QP_P_INITIAL), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QP_B), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_RATECONTROL_QP_B_INITIAL), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_AQ), false);
@@ -597,7 +597,7 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCode
 			av_opt_set_int(context->priv_data, "init_qpI",
 			               obs_data_get_int(settings, ST_RATECONTROL_QP_I_INITIAL), 0);
 			av_opt_set_int(context->priv_data, "init_qpP",
-			               obs_data_get_int(settings, ST_RATECONTROL_QP_ST_INITIAL), 0);
+			               obs_data_get_int(settings, ST_RATECONTROL_QP_P_INITIAL), 0);
 			av_opt_set_int(context->priv_data, "init_qpB",
 			               obs_data_get_int(settings, ST_RATECONTROL_QP_B_INITIAL), 0);
 		}
@@ -645,4 +645,114 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCode
 			}
 		}
 	}
+}
+
+void obsffmpeg::nvenc::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
+{
+	preset cfg_preset = static_cast<preset>(obs_data_get_int(settings, ST_PRESET));
+
+	auto found1 = preset_to_opt.find(cfg_preset);
+	if (found1 != preset_to_opt.end())
+		PLOG_INFO("[%s]   Preset: %s", codec->name, found1->second.c_str());
+
+	ratecontrolmode cfg_rc_mode   = static_cast<ratecontrolmode>(obs_data_get_int(settings, ST_RATECONTROL_MODE));
+	int64_t         cfg_rc_2pass  = obs_data_get_int(settings, ST_RATECONTROL_TWOPASS);
+	int64_t         cfg_rc_lahead = obs_data_get_int(settings, ST_RATECONTROL_LOOKAHEAD);
+	bool            cfg_rc_adapti = obs_data_get_bool(settings, ST_RATECONTROL_ADAPTIVEI);
+	bool            cfg_rc_adaptb = obs_data_get_bool(settings, ST_RATECONTROL_ADAPTIVEB);
+
+	auto found2 = ratecontrolmode_to_opt.find(cfg_rc_mode);
+	if (found2 != ratecontrolmode_to_opt.end())
+		PLOG_INFO("[%s]   Rate Control: %s", codec->name, found2->second.c_str());
+	PLOG_INFO("[%s]     Two Pass: %s", codec->name,
+	          cfg_rc_2pass == 1 ? "Enabled" : (cfg_rc_2pass == 0 ? "Disabled" : "Default"));
+	PLOG_INFO("[%s]     Lookahead: %" PRId64 " Frames", codec->name, cfg_rc_lahead);
+	if (cfg_rc_adapti && cfg_rc_lahead > 0)
+		PLOG_INFO("[%s]       Adaptive I-Frames Enabled", codec->name);
+	if (cfg_rc_adaptb && cfg_rc_lahead > 0)
+		PLOG_INFO("[%s]       Adaptive B-Frames Enabled", codec->name);
+
+	int64_t  cfg_rc_bitrate     = obs_data_get_int(settings, ST_RATECONTROL_BITRATE_TARGET);
+	int64_t  cfg_rc_max_bitrate = obs_data_get_int(settings, ST_RATECONTROL_BITRATE_MAXIMUM);
+	int64_t  cfg_rc_bufsize     = obs_data_get_int(settings, S_RATECONTROL_BUFFERSIZE);
+	bool     cfg_rc_quality     = obs_data_get_bool(settings, ST_RATECONTROL_QUALITY);
+	int64_t  cfg_rc_quality_min = obs_data_get_int(settings, ST_RATECONTROL_QUALITY_MINIMUM);
+	int64_t  cfg_rc_quality_max = obs_data_get_int(settings, ST_RATECONTROL_QUALITY_MAXIMUM);
+	double_t cfg_rc_quality_tgt = obs_data_get_int(settings, ST_RATECONTROL_QUALITY_TARGET);
+	int64_t  cfg_rc_qp_i        = obs_data_get_int(settings, ST_RATECONTROL_QP_I);
+	int64_t  cfg_rc_qp_p        = obs_data_get_int(settings, ST_RATECONTROL_QP_P);
+	int64_t  cfg_rc_qp_b        = obs_data_get_int(settings, ST_RATECONTROL_QP_B);
+	int64_t  cfg_rc_qp_i_init   = obs_data_get_int(settings, ST_RATECONTROL_QP_I_INITIAL);
+	int64_t  cfg_rc_qp_p_init   = obs_data_get_int(settings, ST_RATECONTROL_QP_P_INITIAL);
+	int64_t  cfg_rc_qp_b_init   = obs_data_get_int(settings, ST_RATECONTROL_QP_B_INITIAL);
+
+	{
+		bool have_bitrate     = false;
+		bool have_bitrate_max = false;
+		bool have_quality     = false;
+		bool have_qp          = false;
+		bool have_qp_init     = false;
+
+		switch (cfg_rc_mode) {
+		case ratecontrolmode::CQP:
+			have_qp = true;
+			break;
+		case ratecontrolmode::CBR:
+		case ratecontrolmode::CBR_HQ:
+		case ratecontrolmode::CBR_LD_HQ:
+			have_bitrate = true;
+			av_opt_set_int(context->priv_data, "cbr", 1, 0);
+			break;
+		case ratecontrolmode::VBR:
+		case ratecontrolmode::VBR_HQ:
+			have_bitrate_max = true;
+			have_bitrate     = true;
+			have_quality     = true;
+			have_qp_init     = true;
+			break;
+		}
+
+		PLOG_INFO("[%s]   Buffer Size: %" PRId64, codec->name, cfg_rc_bufsize);
+		if (have_bitrate)
+			PLOG_INFO("[%s]   Bitrate Target: %" PRId64, codec->name, cfg_rc_bitrate);
+		if (have_bitrate_max)
+			PLOG_INFO("[%s]   Bitrate Maximum: %" PRId64, codec->name, cfg_rc_max_bitrate);
+		if (have_quality && cfg_rc_quality) {
+			PLOG_INFO("[%s]   Quality Limits:", codec->name);
+			PLOG_INFO("[%s]     Minimum: %" PRId64, codec->name, cfg_rc_quality_min);
+			PLOG_INFO("[%s]     Maximum: %" PRId64, codec->name, cfg_rc_quality_max);
+			PLOG_INFO("[%s]     Target: %f", codec->name, cfg_rc_quality_tgt);
+		}
+		if (have_qp)
+			PLOG_INFO("[%s]   QP Values: %" PRId64 "/%" PRId64 "/%" PRId64, codec->name, cfg_rc_qp_i,
+			          cfg_rc_qp_p, cfg_rc_qp_b);
+		if (have_qp_init)
+			PLOG_INFO("[%s]   Initial QP Values: %" PRId64 "/%" PRId64 "/%" PRId64, codec->name,
+			          cfg_rc_qp_i_init, cfg_rc_qp_p_init, cfg_rc_qp_b_init);
+	}
+
+	bool    cfg_aq_spatial  = obs_data_get_bool(settings, ST_AQ_SPATIAL);
+	int64_t cfg_aq_strength = obs_data_get_int(settings, ST_AQ_STRENGTH);
+	bool    cfg_aq_temporal = obs_data_get_bool(settings, ST_AQ_TEMPORAL);
+	if (cfg_aq_spatial)
+		PLOG_INFO("[%s]   Spatial AQ Enabled: Strength %" PRId64, codec->name, cfg_aq_strength);
+	if (cfg_aq_temporal)
+		PLOG_INFO("[%s]   Temporal AQ Enabled", codec->name);
+
+	int64_t    cfg_bf          = obs_data_get_int(settings, ST_OTHER_BFRAMES);
+	b_ref_mode cfg_bf_mode     = static_cast<b_ref_mode>(obs_data_get_int(settings, ST_OTHER_BFRAME_REFERENCEMODE));
+	bool       cfg_zerolatency = obs_data_get_bool(settings, ST_OTHER_ZEROLATENCY);
+	bool       cfg_weightp     = obs_data_get_bool(settings, ST_OTHER_WEIGHTED_PREDICTION);
+	bool       cfg_nonrefp     = obs_data_get_bool(settings, ST_OTHER_NONREFERENCE_PFRAMES);
+
+	PLOG_INFO("[%s]   B-Frames: %" PRId64, codec->name, cfg_bf);
+	auto found3 = b_ref_mode_to_opt.find(cfg_bf_mode);
+	if (found3 != b_ref_mode_to_opt.end())
+		PLOG_INFO("[%s]     Reference Mode: %s", codec->name, found3->second.c_str());
+	if (cfg_zerolatency)
+		PLOG_INFO("[%s]   Zero Latency Enabled", codec->name);
+	if (cfg_weightp)
+		PLOG_INFO("[%s]   Weighted Prediction Enabled", codec->name);
+	if (cfg_nonrefp)
+		PLOG_INFO("[%s]   Non-Ref P-Frames Enabled", codec->name);
 }

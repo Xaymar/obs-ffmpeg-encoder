@@ -133,6 +133,27 @@ void obsffmpeg::ui::nvenc_hevc_handler::update(obs_data_t* settings, const AVCod
 	}
 }
 
+void obsffmpeg::ui::nvenc_hevc_handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
+{
+	nvenc::log_options(settings, codec, context);
+
+	profile cfg_profile = static_cast<profile>(obs_data_get_int(settings, P_HEVC_PROFILE));
+	tier    cfg_tier    = static_cast<tier>(obs_data_get_int(settings, P_HEVC_TIER));
+	level   cfg_level   = static_cast<level>(obs_data_get_int(settings, P_HEVC_LEVEL));
+
+	auto found1 = profiles.find(cfg_profile);
+	if (found1 != profiles.end())
+		PLOG_INFO("[%s]   H.265 Profile: %s", codec->name, found1->second.c_str());
+
+	auto found2 = levels.find(cfg_level);
+	if (found2 != levels.end())
+		PLOG_INFO("[%s]   H.265 Level: %s", codec->name, found2->second.c_str());
+
+	auto found3 = tiers.find(cfg_tier);
+	if (found3 != tiers.end())
+		PLOG_INFO("[%s]   H.265 Tier: %s", codec->name, found3->second.c_str());
+}
+
 void obsffmpeg::ui::nvenc_hevc_handler::get_encoder_properties(obs_properties_t* props, const AVCodec* codec)
 {
 	nvenc::get_properties_pre(props, codec);

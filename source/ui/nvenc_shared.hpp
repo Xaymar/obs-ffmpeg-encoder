@@ -84,5 +84,7 @@ namespace obsffmpeg {
 		void get_runtime_properties(obs_properties_t* props, const AVCodec* codec, AVCodecContext* context);
 
 		void update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
+
+		void log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 	} // namespace nvenc
 } // namespace obsffmpeg
