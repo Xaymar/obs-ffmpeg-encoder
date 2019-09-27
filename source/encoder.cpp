@@ -665,19 +665,19 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 	}
 
 	{ // Log Encoder info
-		const char* id = obs_encoder_get_id(_self);
-		PLOG_INFO("[%s] Initializing...", id);
-		PLOG_INFO("[%s]   Video Input: %ldx%ld %s %s %s", id, _swscale.get_source_width(),
+		PLOG_INFO("[%s] Initializing...", _codec->name);
+		PLOG_INFO("[%s]   Video Input: %ldx%ld %s %s %s", _codec->name, _swscale.get_source_width(),
 		          _swscale.get_source_height(),
 		          ffmpeg::tools::get_pixel_format_name(_swscale.get_source_format()),
 		          ffmpeg::tools::get_color_space_name(_swscale.get_source_colorspace()),
 		          _swscale.is_source_full_range() ? "Full" : "Partial");
-		PLOG_INFO("[%s]   Video Output: %ldx%ld %s %s %s", id, _swscale.get_target_width(),
+		PLOG_INFO("[%s]   Video Output: %ldx%ld %s %s %s", _codec->name, _swscale.get_target_width(),
 		          _swscale.get_target_height(),
 		          ffmpeg::tools::get_pixel_format_name(_swscale.get_target_format()),
 		          ffmpeg::tools::get_color_space_name(_swscale.get_target_colorspace()),
 		          _swscale.is_target_full_range() ? "Full" : "Partial");
-		PLOG_INFO("[%s]   Framerate: %ld/%ld (%f FPS)", id, _context->time_base.den, _context->time_base.num,
+		PLOG_INFO("[%s]   Framerate: %ld/%ld (%f FPS)", _codec->name, _context->time_base.den,
+		          _context->time_base.num,
 		          static_cast<double_t>(_context->time_base.den)
 		              / static_cast<double_t>(_context->time_base.num));
 	}
