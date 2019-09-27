@@ -220,10 +220,10 @@ AVColorRange ffmpeg::tools::obs_videorangetype_to_avcolorrange(video_range_type 
 {
 	switch (v) {
 	case VIDEO_RANGE_DEFAULT:
-	case VIDEO_RANGE_FULL:
-		return AVCOL_RANGE_JPEG;
 	case VIDEO_RANGE_PARTIAL:
 		return AVCOL_RANGE_MPEG;
+	case VIDEO_RANGE_FULL:
+		return AVCOL_RANGE_JPEG;
 	}
 	throw std::invalid_argument("unknown range");
 }
@@ -377,4 +377,37 @@ AVPixelFormat ffmpeg::tools::get_best_compatible_format(const AVPixelFormat* lis
 	}
 
 	return best;
+}
+
+void ffmpeg::tools::setup_obs_color(video_colorspace colorspace, video_range_type range, AVCodecContext* context)
+{
+	std::map<video_colorspace, std::tuple<AVColorSpace, AVColorPrimaries, AVColorTransferCharacteristic>>
+	    colorspaces = {
+	        {VIDEO_CS_DEFAULT, {AVCOL_SPC_BT470BG, AVCOL_PRI_BT470BG, AVCOL_TRC_SMPTE170M}},
+	        {VIDEO_CS_601, {AVCOL_SPC_BT470BG, AVCOL_PRI_BT470BG, AVCOL_TRC_SMPTE170M}},
+	        {VIDEO_CS_709, {AVCOL_SPC_BT709, AVCOL_PRI_BT709, AVCOL_TRC_BT709}},
+	    };
+	std::map<video_range_type, AVColorRange> colorranges = {
+	    {VIDEO_RANGE_DEFAULT, AVCOL_RANGE_MPEG},
+	    {VIDEO_RANGE_PARTIAL, AVCOL_RANGE_MPEG},
+	    {VIDEO_RANGE_FULL, AVCOL_RANGE_JPEG},
+	};
+
+	{
+		auto found = colorspaces.find(colorspace);
+		if (found != colorspaces.end()) {
+			context->colorspace      = std::get<AVColorSpace>(found->second);
+			context->color_primaries = std::get<AVColorPrimaries>(found->second);
+			context->color_trc       = std::get<AVColorTransferCharacteristic>(found->second);
+		}
+	}
+	{
+		auto found = colorranges.find(range);
+		if (found != colorranges.end()) {
+			context->color_range = found->second;
+		}
+	}
+
+	// Downscaling should result in downscaling, not pixelation
+	context->chroma_sample_location = AVCHROMA_LOC_CENTER; 
 }

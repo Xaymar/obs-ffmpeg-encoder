@@ -632,25 +632,23 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 			}
 		}
 
-		_context->width                   = voi->width;
-		_context->height                  = voi->height;
-		_context->colorspace              = ffmpeg::tools::obs_videocolorspace_to_avcolorspace(voi->colorspace);
-		_context->color_range             = ffmpeg::tools::obs_videorangetype_to_avcolorrange(voi->range);
+		_context->width  = voi->width;
+		_context->height = voi->height;
+		ffmpeg::tools::setup_obs_color(voi->colorspace, voi->range, _context);
+
 		_context->pix_fmt                 = _pixfmt_target;
 		_context->field_order             = AV_FIELD_PROGRESSIVE;
-		_context->time_base.num           = voi->fps_den;
-		_context->time_base.den           = voi->fps_num;
 		_context->ticks_per_frame         = 1;
 		_context->sample_aspect_ratio.num = _context->sample_aspect_ratio.den = 1;
+		_context->framerate.num = _context->time_base.den = voi->fps_num;
+		_context->framerate.den = _context->time_base.num = voi->fps_den;
 
 		_swscale.set_source_size(_context->width, _context->height);
-		_swscale.set_source_color(_context->color_range, _context->colorspace);
-		_swscale.set_source_full_range(voi->range == VIDEO_RANGE_FULL);
+		_swscale.set_source_color(_context->color_range == AVCOL_RANGE_JPEG, _context->colorspace);
 		_swscale.set_source_format(_pixfmt_source);
 
 		_swscale.set_target_size(_context->width, _context->height);
-		_swscale.set_target_color(_context->color_range, _context->colorspace);
-		_swscale.set_target_full_range(voi->range == VIDEO_RANGE_FULL);
+		_swscale.set_target_color(_context->color_range == AVCOL_RANGE_JPEG, _context->colorspace);
 		_swscale.set_target_format(_pixfmt_target);
 
 		// Create Scaler
@@ -679,8 +677,9 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 		          ffmpeg::tools::get_pixel_format_name(_swscale.get_target_format()),
 		          ffmpeg::tools::get_color_space_name(_swscale.get_target_colorspace()),
 		          _swscale.is_target_full_range() ? "Full" : "Partial");
-		PLOG_INFO("[%s]   Framerate: %ld/%ld (%f", id, _context->time_base.num, _context->time_base.den,
-		          _context->time_base.num / _context->time_base.den);
+		PLOG_INFO("[%s]   Framerate: %ld/%ld (%f FPS)", id, _context->time_base.den, _context->time_base.num,
+		          static_cast<double_t>(_context->time_base.den)
+		              / static_cast<double_t>(_context->time_base.num));
 	}
 
 	// Update settings
@@ -866,11 +865,13 @@ bool obsffmpeg::encoder::video_encode(encoder_frame* frame, encoder_packet* pack
 		ScopeProfiler profile("convert");
 #endif
 
-		vframe->height      = _context->height;
-		vframe->format      = _context->pix_fmt;
-		vframe->color_range = _context->color_range;
-		vframe->colorspace  = _context->colorspace;
-		vframe->pts         = frame->pts;
+		vframe->height          = _context->height;
+		vframe->format          = _context->pix_fmt;
+		vframe->color_range     = _context->color_range;
+		vframe->colorspace      = _context->colorspace;
+		vframe->color_primaries = _context->color_primaries;
+		vframe->color_trc       = _context->color_trc;
+		vframe->pts             = frame->pts;
 
 		if ((_swscale.is_source_full_range() == _swscale.is_target_full_range())
 		    && (_swscale.get_source_colorspace() == _swscale.get_target_colorspace())
@@ -1016,6 +1017,9 @@ int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_pac
 			} else if (_codec->id == AV_CODEC_ID_HEVC) {
 				obsffmpeg::codecs::hevc::extract_header_sei(_current_packet.data, _current_packet.size,
 				                                            _extra_data, _sei_data);
+			} else if (_context->extradata != nullptr) {
+				_extra_data.resize(_context->extradata_size);
+				std::memcpy(_extra_data.data(), _context->extradata, _context->extradata_size);
 			}
 			_have_first_frame = true;
 		}

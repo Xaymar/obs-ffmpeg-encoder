@@ -28,8 +28,8 @@
 #include <vector>
 
 extern "C" {
-#include <libavutil/pixfmt.h>
 #include <libavcodec/avcodec.h>
+#include <libavutil/pixfmt.h>
 }
 
 namespace ffmpeg {
@@ -57,6 +57,8 @@ namespace ffmpeg {
 		std::vector<AVPixelFormat> get_software_formats(const AVPixelFormat* list);
 
 		AVPixelFormat get_best_compatible_format(const AVPixelFormat* list, AVPixelFormat source);
+
+		void setup_obs_color(video_colorspace colorspace, video_range_type range, AVCodecContext* context);
 	} // namespace tools
 } // namespace ffmpeg
 
