@@ -47,12 +47,12 @@ namespace obsffmpeg {
 			                                  const AVCodec* codec, AVCodecContext* context);
 
 			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec,
-			                          AVCodecContext* context) = 0;
+			                          AVCodecContext* context);
 
 			virtual void get_properties(obs_properties_t* props, const AVCodec* codec,
-			                            AVCodecContext* context) = 0;
+			                            AVCodecContext* context);
 
-			virtual void update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context) = 0;
+			virtual void update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 
 			virtual void log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 
