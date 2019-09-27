@@ -272,6 +272,8 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/codecs/hevc.cpp"
 	"${PROJECT_SOURCE_DIR}/source/codecs/h264.hpp"
 	"${PROJECT_SOURCE_DIR}/source/codecs/h264.cpp"
+	"${PROJECT_SOURCE_DIR}/source/codecs/prores.hpp"
+	"${PROJECT_SOURCE_DIR}/source/codecs/prores.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/avframe-queue.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/avframe-queue.hpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/swscale.hpp"
