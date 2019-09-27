@@ -591,9 +591,6 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 		}
 	}
 
-	// Update settings
-	update(settings);
-
 	// Create 8MB of precached Packet data for use later on.
 	av_init_packet(&_current_packet);
 	av_new_packet(&_current_packet, 8 * 1024 * 1024); // 8 MB precached Packet size.
@@ -610,6 +607,13 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 			// Find the best conversion format.
 			std::vector<AVPixelFormat> fmts = ffmpeg::tools::get_software_formats(_codec->pix_fmts);
 			_pixfmt_target = ffmpeg::tools::get_best_compatible_format(fmts.data(), _pixfmt_source);
+
+			{ // Allow Handler to override the automatic color format for sanity reasons.
+				auto ptr = obsffmpeg::find_codec_handler(_codec->name);
+				if (ptr) {
+					ptr->override_colorformat(_pixfmt_target, settings, _codec, _context);
+				}
+			}
 		} else {
 			// Use user override, guaranteed to be supported.
 			bool is_format_supported = false;
@@ -660,6 +664,26 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 			throw std::runtime_error(sstr.str());
 		}
 	}
+
+	{ // Log Encoder info
+		const char* id = obs_encoder_get_id(_self);
+		PLOG_INFO("[%s] Initializing...", id);
+		PLOG_INFO("[%s]   Video Input: %ldx%ld %s %s %s", id, _swscale.get_source_width(),
+		          _swscale.get_source_height(),
+		          ffmpeg::tools::get_pixel_format_name(_swscale.get_source_format()),
+		          ffmpeg::tools::get_color_space_name(_swscale.get_source_colorspace()),
+		          _swscale.is_source_full_range() ? "Full" : "Partial");
+		PLOG_INFO("[%s]   Video Output: %ldx%ld %s %s %s", id, _swscale.get_target_width(),
+		          _swscale.get_target_height(),
+		          ffmpeg::tools::get_pixel_format_name(_swscale.get_target_format()),
+		          ffmpeg::tools::get_color_space_name(_swscale.get_target_colorspace()),
+		          _swscale.is_target_full_range() ? "Full" : "Partial");
+		PLOG_INFO("[%s]   Framerate: %ld/%ld (%f", id, _context->time_base.num, _context->time_base.den,
+		          _context->time_base.num / _context->time_base.den);
+	}
+
+	// Update settings
+	update(settings);
 
 	// Initialize Encoder
 	int res = avcodec_open2(_context, _codec, NULL);
@@ -752,6 +776,14 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 		av_opt_set_from_string(_context->priv_data, obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS),
 		                       nullptr, "=", ";");
 	}
+
+	{ // Handler Logging
+		auto ptr = obsffmpeg::find_codec_handler(_codec->name);
+		if (ptr) {
+			ptr->log_options(settings, _codec, _context);
+		}
+	}
+
 	return false;
 }
 

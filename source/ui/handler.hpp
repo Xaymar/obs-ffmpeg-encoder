@@ -24,7 +24,10 @@
 #include <string>
 
 extern "C" {
+#include <obs.h>
+
 #include <obs-data.h>
+#include <obs-encoder.h>
 #include <obs-properties.h>
 #pragma warning(push)
 #pragma warning(disable : 4244)
@@ -38,6 +41,11 @@ namespace obsffmpeg {
 			public:
 			virtual void override_visible_name(const AVCodec* codec, std::string& name);
 
+			virtual void override_info(obs_encoder_info* main, obs_encoder_info* fallback);
+
+			virtual void override_colorformat(AVPixelFormat& target_format, obs_data_t* settings,
+			                                  const AVCodec* codec, AVCodecContext* context);
+
 			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec,
 			                          AVCodecContext* context) = 0;
 
@@ -45,6 +53,14 @@ namespace obsffmpeg {
 			                            AVCodecContext* context) = 0;
 
 			virtual void update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context) = 0;
+
+			virtual void log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
+
+			virtual void import_from_ffmpeg(const std::string ffmpeg, obs_data_t* settings,
+			                                const AVCodec* codec, AVCodecContext* context);
+
+			virtual std::string export_for_ffmpeg(obs_data_t* settings, const AVCodec* codec,
+			                                      AVCodecContext* context);
 		};
 	} // namespace ui
 } // namespace obsffmpeg

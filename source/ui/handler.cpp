@@ -22,3 +22,21 @@
 #include "handler.hpp"
 
 void obsffmpeg::ui::handler::override_visible_name(const AVCodec*, std::string&) {}
+
+void obsffmpeg::ui::handler::override_info(obs_encoder_info* main, obs_encoder_info* fallback) {}
+
+void obsffmpeg::ui::handler::override_colorformat(AVPixelFormat& target_format, obs_data_t* settings,
+                                                  const AVCodec* codec, AVCodecContext* context)
+{}
+
+void obsffmpeg::ui::handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context) {}
+
+void obsffmpeg::ui::handler::import_from_ffmpeg(const std::string ffmpeg, obs_data_t* settings, const AVCodec* codec,
+                                                AVCodecContext* context)
+{}
+
+std::string obsffmpeg::ui::handler::export_for_ffmpeg(obs_data_t* settings, const AVCodec* codec,
+                                                      AVCodecContext* context)
+{
+	return std::string();
+}
