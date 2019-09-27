@@ -680,6 +680,8 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 		          _context->time_base.num,
 		          static_cast<double_t>(_context->time_base.den)
 		              / static_cast<double_t>(_context->time_base.num));
+		PLOG_INFO("[%s]   Custom Settings: %s", _codec->name,
+		          obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS));
 	}
 
 	// Update settings
