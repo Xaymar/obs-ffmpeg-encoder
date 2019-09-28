@@ -365,7 +365,7 @@ AVPixelFormat ffmpeg::tools::get_best_compatible_format(const AVPixelFormat* lis
 
 	for (auto fmt = list; fmt && (*fmt != AV_PIX_FMT_NONE); fmt++) {
 		auto found = format_compatibility.find(std::pair{source, *fmt});
-		if (found != format_compatibility.end()) {
+		if (found != format_compatibility.end() && (score < found->second)) {
 			score = found->second;
 			best  = *fmt;
 		}
