@@ -27,6 +27,7 @@
 #include <vector>
 #include "ffmpeg/avframe-queue.hpp"
 #include "ffmpeg/swscale.hpp"
+#include "hwapi/base.hpp"
 #include "ui/handler.hpp"
 
 extern "C" {
@@ -80,10 +81,14 @@ namespace obsffmpeg {
 		obs_encoder_t*   _self;
 		encoder_factory* _factory;
 
-		const AVCodec*  _codec;
-		AVCodecContext* _context;
+		const AVCodec*     _codec;
+		AVCodecContext*    _context;
+		AVHWFramesContext* _hwcontext;
 
 		std::shared_ptr<obsffmpeg::ui::handler> _handler;
+
+		std::shared_ptr<obsffmpeg::hwapi::base>     _hwapi;
+		std::shared_ptr<obsffmpeg::hwapi::instance> _hwinst;
 
 		ffmpeg::avframe_queue _frame_queue;
 		ffmpeg::avframe_queue _frame_queue_used;
@@ -97,6 +102,9 @@ namespace obsffmpeg {
 		bool                 _have_first_frame;
 		std::vector<uint8_t> _extra_data;
 		std::vector<uint8_t> _sei_data;
+
+		void initialize_sw(obs_data_t* settings);
+		void initialize_hw(obs_data_t* settings);
 
 		public:
 		encoder(obs_data_t* settings, obs_encoder_t* encoder, bool is_texture_encode = false);
@@ -130,5 +138,8 @@ namespace obsffmpeg {
 		int receive_packet(bool* received_packet, struct encoder_packet* packet);
 
 		int send_frame(std::shared_ptr<AVFrame> frame);
+
+		bool encode_avframe(std::shared_ptr<AVFrame>& frame, struct encoder_packet* packet,
+		                    bool* received_packet);
 	};
 } // namespace obsffmpeg

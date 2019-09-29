@@ -52,6 +52,11 @@ extern "C" {
 // - encode_texture/encode
 // I don't understand what get_video_info is actually for in this order, as this postpones initialization to encode...
 
+#ifdef WIN32
+#define HARDWARE_ENCODING
+#include "hwapi/d3d11.hpp"
+#endif
+
 // FFmpeg
 #define ST_FFMPEG "FFmpeg"
 #define ST_FFMPEG_CUSTOMSETTINGS "FFmpeg.CustomSettings"
@@ -328,6 +333,7 @@ obsffmpeg::encoder_factory::encoder_factory(const AVCodec* codec) : avcodec_ptr(
 #endif
 
 	// Hardware encoder?
+#ifdef HARDWARE_ENCODING
 	if (ffmpeg::tools::can_hardware_encode(avcodec_ptr)) {
 		info_fallback.uid           = info.uid + "_sw";
 		info_fallback.codec         = info.codec;
@@ -341,6 +347,7 @@ obsffmpeg::encoder_factory::encoder_factory(const AVCodec* codec) : avcodec_ptr(
 
 		info.oei.caps |= OBS_ENCODER_CAP_PASS_TEXTURE;
 	}
+#endif
 }
 
 obsffmpeg::encoder_factory::~encoder_factory() {}
@@ -541,59 +548,8 @@ const obsffmpeg::encoder_info& obsffmpeg::encoder_factory::get_fallback()
 	return info_fallback;
 }
 
-obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool is_texture_encode)
-    : _self(encoder), _lag_in_frames(0), _count_send_frames(0), _have_first_frame(false)
+void obsffmpeg::encoder::initialize_sw(obs_data_t* settings)
 {
-	if (is_texture_encode) {
-		throw obsffmpeg::unsupported_gpu_exception("not implemented yet");
-	}
-
-	_factory = reinterpret_cast<encoder_factory*>(obs_encoder_get_type_data(_self));
-
-	// Verify that the codec actually still exists.
-	_codec = avcodec_find_encoder_by_name(_factory->get_avcodec()->name);
-	if (!_codec) {
-		PLOG_ERROR("Failed to find encoder for codec '%s'.", _factory->get_avcodec()->name);
-		throw std::runtime_error("failed to find codec");
-	}
-
-	// Find Codec UI handler.
-	_handler = obsffmpeg::find_codec_handler(_codec->name);
-
-	// Initialize context.
-	_context = avcodec_alloc_context3(_codec);
-	if (!_context) {
-		PLOG_ERROR("Failed to create context for encoder '%s'.", _codec->name);
-		throw std::runtime_error("failed to create context");
-	}
-
-	// Settings
-	/// Rate Control
-	_context->strict_std_compliance = static_cast<int>(obs_data_get_int(settings, ST_FFMPEG_STANDARDCOMPLIANCE));
-	_context->debug                 = 0;
-	/// Threading
-	if (_codec->capabilities
-	    & (AV_CODEC_CAP_AUTO_THREADS | AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_SLICE_THREADS)) {
-		if (_codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
-			_context->thread_type |= FF_THREAD_FRAME;
-		}
-		if (_codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
-			_context->thread_type |= FF_THREAD_SLICE;
-		}
-		int64_t threads = obs_data_get_int(settings, ST_FFMPEG_THREADS);
-		if (threads > 0) {
-			_context->thread_count = static_cast<int>(threads);
-			_lag_in_frames         = _context->thread_count;
-		} else {
-			_context->thread_count = std::thread::hardware_concurrency();
-			_lag_in_frames         = _context->thread_count;
-		}
-	}
-
-	// Create 8MB of precached Packet data for use later on.
-	av_init_packet(&_current_packet);
-	av_new_packet(&_current_packet, 8 * 1024 * 1024); // 8 MB precached Packet size.
-
 	if (_codec->type == AVMEDIA_TYPE_VIDEO) {
 		// Initialize Video Encoding
 		auto voi = video_output_get_info(obs_encoder_video(_self));
@@ -656,27 +612,105 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 			     << (_swscale.is_source_full_range() ? "full" : "partial") << " range.";
 			throw std::runtime_error(sstr.str());
 		}
+
+		// Create Frame queue
+		_frame_queue.set_pixel_format(_context->pix_fmt);
+		_frame_queue.set_resolution(_context->width, _context->height);
+		_frame_queue.precache(2);
+	}
+}
+
+void obsffmpeg::encoder::initialize_hw(obs_data_t* settings)
+{
+	// Initialize Video Encoding
+	auto voi = video_output_get_info(obs_encoder_video(_self));
+
+	_context->width                   = voi->width;
+	_context->height                  = voi->height;
+	_context->field_order             = AV_FIELD_PROGRESSIVE;
+	_context->ticks_per_frame         = 1;
+	_context->sample_aspect_ratio.num = _context->sample_aspect_ratio.den = 1;
+	_context->framerate.num = _context->time_base.den = voi->fps_num;
+	_context->framerate.den = _context->time_base.num = voi->fps_den;
+	ffmpeg::tools::setup_obs_color(voi->colorspace, voi->range, _context);
+	_context->sw_pix_fmt = ffmpeg::tools::obs_videoformat_to_avpixelformat(voi->format);
+
+#ifdef WIN32
+	_context->pix_fmt = AV_PIX_FMT_D3D11;
+#endif
+
+	_context->hw_device_ctx = _hwinst->create_device_context();
+
+	_context->hw_frames_ctx = av_hwframe_ctx_alloc(_context->hw_device_ctx);
+	if (!_context->hw_frames_ctx)
+		throw std::runtime_error("Failed to allocate AVHWFramesContext.");
+
+	AVHWFramesContext* ctx = reinterpret_cast<AVHWFramesContext*>(_context->hw_frames_ctx->data);
+	ctx->width             = _context->width;
+	ctx->height            = _context->height;
+	ctx->format            = _context->pix_fmt;
+	ctx->sw_format         = _context->sw_pix_fmt;
+
+	if (av_hwframe_ctx_init(_context->hw_frames_ctx) < 0)
+		throw std::runtime_error("Failed to initialize AVHWFramesContext.");
+}
+
+obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool is_texture_encode)
+    : _self(encoder), _lag_in_frames(0), _count_send_frames(0), _have_first_frame(false)
+{
+	// Initial set up.
+	_factory = reinterpret_cast<encoder_factory*>(obs_encoder_get_type_data(_self));
+	_codec   = _factory->get_avcodec();
+	_handler = obsffmpeg::find_codec_handler(_codec->name);
+
+	if (is_texture_encode) {
+#ifdef WIN32
+		_hwapi = std::make_shared<obsffmpeg::hwapi::d3d11>();
+#endif
+		obsffmpeg::hwapi::device dev;
+		if (_handler)
+			dev = _handler->find_hw_device(_hwapi, _codec, _context);
+		try {
+			_hwinst = _hwapi->create(dev);
+		} catch (...) {
+			throw obsffmpeg::unsupported_gpu_exception("Creating GPU context failed.");
+		}
 	}
 
-	{ // Log Encoder info
-		PLOG_INFO("[%s] Initializing...", _codec->name);
-		PLOG_INFO("[%s]   Video Input: %ldx%ld %s %s %s", _codec->name, _swscale.get_source_width(),
-		          _swscale.get_source_height(),
-		          ffmpeg::tools::get_pixel_format_name(_swscale.get_source_format()),
-		          ffmpeg::tools::get_color_space_name(_swscale.get_source_colorspace()),
-		          _swscale.is_source_full_range() ? "Full" : "Partial");
-		PLOG_INFO("[%s]   Video Output: %ldx%ld %s %s %s", _codec->name, _swscale.get_target_width(),
-		          _swscale.get_target_height(),
-		          ffmpeg::tools::get_pixel_format_name(_swscale.get_target_format()),
-		          ffmpeg::tools::get_color_space_name(_swscale.get_target_colorspace()),
-		          _swscale.is_target_full_range() ? "Full" : "Partial");
-		PLOG_INFO("[%s]   Framerate: %ld/%ld (%f FPS)", _codec->name, _context->time_base.den,
-		          _context->time_base.num,
-		          static_cast<double_t>(_context->time_base.den)
-		              / static_cast<double_t>(_context->time_base.num));
-		PLOG_INFO("[%s]   Custom Settings: %s", _codec->name,
-		          obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS));
+	// Initialize context.
+	_context = avcodec_alloc_context3(_codec);
+	if (!_context) {
+		PLOG_ERROR("Failed to create context for encoder '%s'.", _codec->name);
+		throw std::runtime_error("failed to create context");
 	}
+
+	// Create 8MB of precached Packet data for use later on.
+	av_init_packet(&_current_packet);
+	av_new_packet(&_current_packet, 8 * 1024 * 1024); // 8 MB precached Packet size.
+
+	if (!is_texture_encode) {
+		initialize_sw(settings);
+	} else {
+		try {
+			initialize_hw(settings);
+		} catch (...) {
+			throw obsffmpeg::unsupported_gpu_exception("Initializing hardware context failed.");
+		}
+	}
+
+	// Log Encoder info
+	PLOG_INFO("[%s] Initializing...", _codec->name);
+	PLOG_INFO("[%s]   Video Input: %ldx%ld %s %s %s", _codec->name, _swscale.get_source_width(),
+	          _swscale.get_source_height(), ffmpeg::tools::get_pixel_format_name(_swscale.get_source_format()),
+	          ffmpeg::tools::get_color_space_name(_swscale.get_source_colorspace()),
+	          _swscale.is_source_full_range() ? "Full" : "Partial");
+	PLOG_INFO("[%s]   Video Output: %ldx%ld %s %s %s", _codec->name, _swscale.get_target_width(),
+	          _swscale.get_target_height(), ffmpeg::tools::get_pixel_format_name(_swscale.get_target_format()),
+	          ffmpeg::tools::get_color_space_name(_swscale.get_target_colorspace()),
+	          _swscale.is_target_full_range() ? "Full" : "Partial");
+	PLOG_INFO("[%s]   Framerate: %ld/%ld (%f FPS)", _codec->name, _context->time_base.den, _context->time_base.num,
+	          static_cast<double_t>(_context->time_base.den) / static_cast<double_t>(_context->time_base.num));
+	PLOG_INFO("[%s]   Custom Settings: %s", _codec->name, obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS));
 
 	// Update settings
 	update(settings);
@@ -689,11 +723,6 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 		     << "' failed with error: " << ffmpeg::tools::get_error_description(res) << " (code " << res << ")";
 		throw std::runtime_error(sstr.str());
 	}
-
-	// Create Frame queue
-	_frame_queue.set_pixel_format(_context->pix_fmt);
-	_frame_queue.set_resolution(_context->width, _context->height);
-	_frame_queue.precache(2);
 }
 
 obsffmpeg::encoder::~encoder()
@@ -737,6 +766,29 @@ void obsffmpeg::encoder::get_properties(obs_properties_t* props)
 
 bool obsffmpeg::encoder::update(obs_data_t* settings)
 {
+	// Settings
+	/// Rate Control
+	_context->strict_std_compliance = static_cast<int>(obs_data_get_int(settings, ST_FFMPEG_STANDARDCOMPLIANCE));
+	_context->debug                 = 0;
+	/// Threading
+	if (_codec->capabilities
+	    & (AV_CODEC_CAP_AUTO_THREADS | AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_SLICE_THREADS)) {
+		if (_codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+			_context->thread_type |= FF_THREAD_FRAME;
+		}
+		if (_codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+			_context->thread_type |= FF_THREAD_SLICE;
+		}
+		int64_t threads = obs_data_get_int(settings, ST_FFMPEG_THREADS);
+		if (threads > 0) {
+			_context->thread_count = static_cast<int>(threads);
+			_lag_in_frames         = _context->thread_count;
+		} else {
+			_context->thread_count = std::thread::hardware_concurrency();
+			_lag_in_frames         = _context->thread_count;
+		}
+	}
+
 	if (_handler)
 		_handler->update(settings, _codec, _context);
 
@@ -874,88 +926,8 @@ bool obsffmpeg::encoder::video_encode(encoder_frame* frame, encoder_packet* pack
 		}
 	}
 
-	// Send and receive frames.
-	{
-#ifdef _DEBUG
-		ScopeProfiler profile("loop");
-#endif
-
-		bool sent_frame  = false;
-		bool recv_packet = false;
-		bool should_lag  = (_lag_in_frames - _count_send_frames) <= 0;
-
-		auto loop_begin = std::chrono::high_resolution_clock::now();
-		auto loop_end   = loop_begin + std::chrono::milliseconds(50);
-
-		while ((!sent_frame || (should_lag && !recv_packet))
-		       && !(std::chrono::high_resolution_clock::now() > loop_end)) {
-			bool eagain_is_stupid = false;
-
-			if (!sent_frame) {
-#ifdef _DEBUG
-				ScopeProfiler profile_inner("send");
-#endif
-				int res = send_frame(vframe);
-				switch (res) {
-				case 0:
-					sent_frame = true;
-					vframe     = nullptr;
-					break;
-				case AVERROR(EAGAIN):
-					// This means we should call receive_packet again, but what do we do with that data?
-					// Why can't we queue on both? Do I really have to implement threading for this stuff?
-					if (*received_packet == true) {
-						PLOG_WARNING(
-						    "Skipped frame due to EAGAIN when a packet was already returned.");
-						sent_frame = true;
-					}
-					eagain_is_stupid = true;
-					break;
-				case AVERROR(EOF):
-					PLOG_ERROR("Skipped frame due to end of stream.");
-					sent_frame = true;
-					break;
-				default:
-					PLOG_ERROR("Failed to encode frame: %s (%ld).",
-					           ffmpeg::tools::get_error_description(res), res);
-					return false;
-				}
-			}
-
-			if (!recv_packet) {
-#ifdef _DEBUG
-				ScopeProfiler profile_inner("recieve");
-#endif
-				int res = receive_packet(received_packet, packet);
-				switch (res) {
-				case 0:
-					recv_packet = true;
-					break;
-				case AVERROR(EOF):
-					PLOG_ERROR("Received end of file.");
-					recv_packet = true;
-					break;
-				case AVERROR(EAGAIN):
-					if (sent_frame) {
-						recv_packet = true;
-					}
-					if (eagain_is_stupid) {
-						PLOG_ERROR("Both send and recieve returned EAGAIN, encoder is broken.");
-						return false;
-					}
-					break;
-				default:
-					PLOG_ERROR("Failed to receive packet: %s (%ld).",
-					           ffmpeg::tools::get_error_description(res), res);
-					return false;
-				}
-			}
-
-			if (!sent_frame || !recv_packet) {
-				std::this_thread::sleep_for(std::chrono::milliseconds(1));
-			}
-		}
-	}
+	if (!encode_avframe(vframe, packet, received_packet))
+		return false;
 
 	if (vframe != nullptr) {
 		_frame_queue.push(vframe);
@@ -964,9 +936,34 @@ bool obsffmpeg::encoder::video_encode(encoder_frame* frame, encoder_packet* pack
 	return true;
 }
 
-bool obsffmpeg::encoder::video_encode_texture(uint32_t, int64_t, uint64_t, uint64_t*, encoder_packet*, bool*)
+bool obsffmpeg::encoder::video_encode_texture(uint32_t handle, int64_t pts, uint64_t lock_key, uint64_t* next_lock_key,
+                                              encoder_packet* packet, bool* received_packet)
 {
-	return false;
+	if (handle == GS_INVALID_HANDLE) {
+		PLOG_ERROR("Received invalid handle.");
+		*next_lock_key = lock_key;
+		return false;
+	}
+
+	std::shared_ptr<AVFrame> frame{av_frame_alloc(), [](void* ptr) {
+		                               av_frame_unref(reinterpret_cast<AVFrame*>(ptr));
+		                               av_frame_free(reinterpret_cast<AVFrame**>(&ptr));
+	                               }};
+		
+	std::shared_ptr<AVFrame> vframe = _hwinst->avframe_from_obs(_context->hw_frames_ctx, handle, lock_key, next_lock_key);
+
+	vframe->color_range     = _context->color_range;
+	vframe->colorspace      = _context->colorspace;
+	vframe->color_primaries = _context->color_primaries;
+	vframe->color_trc       = _context->color_trc;
+	vframe->pts             = pts;
+
+	if (!encode_avframe(vframe, packet, received_packet))
+		return false;
+
+	*next_lock_key = lock_key;
+
+	return true;
 }
 
 int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_packet* packet)
@@ -1039,11 +1036,96 @@ int obsffmpeg::encoder::send_frame(std::shared_ptr<AVFrame> const frame)
 	int res = avcodec_send_frame(_context, frame.get());
 	switch (res) {
 	case 0:
-		_frame_queue_used.push(frame);
+		if (!_hwapi)
+			_frame_queue_used.push(frame);
 		_count_send_frames++;
 	case AVERROR(EAGAIN):
 	case AVERROR(EOF):
 		break;
 	}
 	return res;
+}
+
+bool obsffmpeg::encoder::encode_avframe(std::shared_ptr<AVFrame>& frame, encoder_packet* packet, bool* received_packet)
+{
+#ifdef _DEBUG
+	ScopeProfiler profile("loop");
+#endif
+
+	bool sent_frame  = false;
+	bool recv_packet = false;
+	bool should_lag  = (_lag_in_frames - _count_send_frames) <= 0;
+
+	auto loop_begin = std::chrono::high_resolution_clock::now();
+	auto loop_end   = loop_begin + std::chrono::milliseconds(50);
+
+	while ((!sent_frame || (should_lag && !recv_packet))
+	       && !(std::chrono::high_resolution_clock::now() > loop_end)) {
+		bool eagain_is_stupid = false;
+
+		if (!sent_frame) {
+#ifdef _DEBUG
+			ScopeProfiler profile_inner("send");
+#endif
+			int res = send_frame(frame);
+			switch (res) {
+			case 0:
+				sent_frame = true;
+				frame      = nullptr;
+				break;
+			case AVERROR(EAGAIN):
+				// This means we should call receive_packet again, but what do we do with that data?
+				// Why can't we queue on both? Do I really have to implement threading for this stuff?
+				if (*received_packet == true) {
+					PLOG_WARNING("Skipped frame due to EAGAIN when a packet was already returned.");
+					sent_frame = true;
+				}
+				eagain_is_stupid = true;
+				break;
+			case AVERROR(EOF):
+				PLOG_ERROR("Skipped frame due to end of stream.");
+				sent_frame = true;
+				break;
+			default:
+				PLOG_ERROR("Failed to encode frame: %s (%ld).",
+				           ffmpeg::tools::get_error_description(res), res);
+				return false;
+			}
+		}
+
+		if (!recv_packet) {
+#ifdef _DEBUG
+			ScopeProfiler profile_inner("recieve");
+#endif
+			int res = receive_packet(received_packet, packet);
+			switch (res) {
+			case 0:
+				recv_packet = true;
+				break;
+			case AVERROR(EOF):
+				PLOG_ERROR("Received end of file.");
+				recv_packet = true;
+				break;
+			case AVERROR(EAGAIN):
+				if (sent_frame) {
+					recv_packet = true;
+				}
+				if (eagain_is_stupid) {
+					PLOG_ERROR("Both send and recieve returned EAGAIN, encoder is broken.");
+					return false;
+				}
+				break;
+			default:
+				PLOG_ERROR("Failed to receive packet: %s (%ld).",
+				           ffmpeg::tools::get_error_description(res), res);
+				return false;
+			}
+		}
+
+		if (!sent_frame || !recv_packet) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+	}
+
+	return true;
 }
