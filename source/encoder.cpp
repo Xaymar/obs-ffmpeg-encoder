@@ -79,7 +79,7 @@ static void* _create_texture(obs_data_t* settings, obs_encoder_t* encoder) noexc
 	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, settings, encoder);
 #endif
 	return reinterpret_cast<void*>(new obsffmpeg::encoder(settings, encoder, true));
-} catch (const obsffmpeg::unsupported_gpu_exception& ex) {
+} catch (const obsffmpeg::unsupported_gpu_exception&) {
 	obsffmpeg::encoder_factory* fac =
 	    reinterpret_cast<obsffmpeg::encoder_factory*>(obs_encoder_get_type_data(encoder));
 	PLOG_WARNING("<%s> GPU not supported for hardware encoding, falling back to software.",
@@ -282,6 +282,9 @@ static bool _encode_audio(void* ptr, struct encoder_frame* frame, struct encoder
 
 obsffmpeg::encoder_factory::encoder_factory(const AVCodec* codec) : avcodec_ptr(codec), info(), info_fallback()
 {
+	// Find Codec UI handler.
+	_handler = obsffmpeg::find_codec_handler(avcodec_ptr->name);
+
 	// Unique Id is FFmpeg name.
 	info.uid = avcodec_ptr->name;
 
@@ -298,8 +301,8 @@ obsffmpeg::encoder_factory::encoder_factory(const AVCodec* codec) : avcodec_ptr(
 		info.readable_name = sstr.str();
 
 		// Allow UI Handler to replace visible name.
-		obsffmpeg::find_codec_handler(avcodec_ptr->name)
-		    ->override_visible_name(avcodec_ptr, info.readable_name);
+		if (_handler)
+			_handler->override_visible_name(avcodec_ptr, info.readable_name);
 	}
 
 	// Assign Ids.
@@ -405,12 +408,8 @@ void obsffmpeg::encoder_factory::register_encoder()
 
 void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings)
 {
-	{ // Handler
-		auto ptr = obsffmpeg::find_codec_handler(avcodec_ptr->name);
-		if (ptr) {
-			ptr->get_defaults(settings, avcodec_ptr, nullptr);
-		}
-	}
+	if (_handler)
+		_handler->get_defaults(settings, avcodec_ptr, nullptr);
 
 	if ((avcodec_ptr->capabilities & AV_CODEC_CAP_INTRA_ONLY) == 0) {
 		obs_data_set_default_int(settings, S_KEYFRAMES_INTERVALTYPE, 0);
@@ -442,12 +441,8 @@ static bool modified_keyframes(obs_properties_t* props, obs_property_t*, obs_dat
 
 void obsffmpeg::encoder_factory::get_properties(obs_properties_t* props)
 {
-	{ // Handler
-		auto ptr = obsffmpeg::find_codec_handler(avcodec_ptr->name);
-		if (ptr) {
-			ptr->get_properties(props, avcodec_ptr, nullptr);
-		}
-	}
+	if (_handler)
+		_handler->get_properties(props, avcodec_ptr, nullptr);
 
 	if ((avcodec_ptr->capabilities & AV_CODEC_CAP_INTRA_ONLY) == 0) {
 		// Key-Frame Options
@@ -562,6 +557,9 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 		throw std::runtime_error("failed to find codec");
 	}
 
+	// Find Codec UI handler.
+	_handler = obsffmpeg::find_codec_handler(_codec->name);
+
 	// Initialize context.
 	_context = avcodec_alloc_context3(_codec);
 	if (!_context) {
@@ -609,12 +607,8 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 			std::vector<AVPixelFormat> fmts = ffmpeg::tools::get_software_formats(_codec->pix_fmts);
 			_pixfmt_target = ffmpeg::tools::get_best_compatible_format(fmts.data(), _pixfmt_source);
 
-			{ // Allow Handler to override the automatic color format for sanity reasons.
-				auto ptr = obsffmpeg::find_codec_handler(_codec->name);
-				if (ptr) {
-					ptr->override_colorformat(_pixfmt_target, settings, _codec, _context);
-				}
-			}
+			if (_handler) // Allow Handler to override the automatic color format for sanity reasons.
+				_handler->override_colorformat(_pixfmt_target, settings, _codec, _context);
 		} else {
 			// Use user override, guaranteed to be supported.
 			bool is_format_supported = false;
@@ -728,12 +722,8 @@ obsffmpeg::encoder::~encoder()
 
 void obsffmpeg::encoder::get_properties(obs_properties_t* props)
 {
-	{ // Handler
-		auto ptr = obsffmpeg::find_codec_handler(_codec->name);
-		if (ptr) {
-			ptr->get_properties(props, _codec, _context);
-		}
-	}
+	if (_handler)
+		_handler->get_properties(props, _codec, _context);
 
 	obs_property_set_enabled(obs_properties_get(props, S_KEYFRAMES), false);
 	obs_property_set_enabled(obs_properties_get(props, S_KEYFRAMES_INTERVALTYPE), false);
@@ -747,12 +737,8 @@ void obsffmpeg::encoder::get_properties(obs_properties_t* props)
 
 bool obsffmpeg::encoder::update(obs_data_t* settings)
 {
-	{ // Handler
-		auto ptr = obsffmpeg::find_codec_handler(_codec->name);
-		if (ptr) {
-			ptr->update(settings, _codec, _context);
-		}
-	}
+	if (_handler)
+		_handler->update(settings, _codec, _context);
 
 	if ((_codec->capabilities & AV_CODEC_CAP_INTRA_ONLY) == 0) {
 		// Key-Frame Options
@@ -779,14 +765,11 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 		                       nullptr, "=", ";");
 	}
 
-	{ // Handler Logging
-		auto ptr = obsffmpeg::find_codec_handler(_codec->name);
-		if (ptr) {
-			ptr->log_options(settings, _codec, _context);
-		}
-	}
+	// Handler Logging
+	if (_handler)
+		_handler->log_options(settings, _codec, _context);
 
-	return false;
+	return true;
 }
 
 void obsffmpeg::encoder::get_audio_info(audio_convert_info*) {}
@@ -988,6 +971,8 @@ bool obsffmpeg::encoder::video_encode_texture(uint32_t, int64_t, uint64_t, uint6
 
 int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_packet* packet)
 {
+	av_packet_unref(&_current_packet);
+
 	int res = avcodec_receive_packet(_context, &_current_packet);
 	if (res == 0) {
 		if (!_have_first_frame) {
@@ -1010,8 +995,9 @@ int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_pac
 					std::memcpy(_sei_data.data(), tmp_sei, sz_sei);
 				}
 
-				std::memcpy(_current_packet.data, tmp_packet, sz_packet);
-				_current_packet.size = static_cast<int>(sz_packet);
+				// Not required, we only need the Extra Data and SEI Data anyway.
+				//std::memcpy(_current_packet.data, tmp_packet, sz_packet);
+				//_current_packet.size = static_cast<int>(sz_packet);
 
 				bfree(tmp_packet);
 				bfree(tmp_header);
@@ -1025,6 +1011,10 @@ int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_pac
 			}
 			_have_first_frame = true;
 		}
+
+		// Allow Handler Post-Processing
+		if (_handler)
+			_handler->process_avpacket(_current_packet, _codec, _context);
 
 		packet->type          = OBS_ENCODER_VIDEO;
 		packet->pts           = _current_packet.pts;

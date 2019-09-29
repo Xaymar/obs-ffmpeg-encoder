@@ -27,6 +27,7 @@
 #include <vector>
 #include "ffmpeg/avframe-queue.hpp"
 #include "ffmpeg/swscale.hpp"
+#include "ui/handler.hpp"
 
 extern "C" {
 #include <obs-properties.h>
@@ -56,6 +57,8 @@ namespace obsffmpeg {
 		encoder_info   info_fallback;
 		const AVCodec* avcodec_ptr;
 
+		std::shared_ptr<obsffmpeg::ui::handler> _handler;
+
 		public:
 		encoder_factory(const AVCodec* codec);
 		virtual ~encoder_factory();
@@ -79,6 +82,8 @@ namespace obsffmpeg {
 
 		const AVCodec*  _codec;
 		AVCodecContext* _context;
+
+		std::shared_ptr<obsffmpeg::ui::handler> _handler;
 
 		ffmpeg::avframe_queue _frame_queue;
 		ffmpeg::avframe_queue _frame_queue_used;
