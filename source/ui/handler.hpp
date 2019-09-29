@@ -60,6 +60,8 @@ namespace obsffmpeg {
 
 			virtual std::string export_for_ffmpeg(obs_data_t* settings, const AVCodec* codec,
 			                                      AVCodecContext* context);
+
+			virtual void process_avpacket(AVPacket& packet, const AVCodec* codec, AVCodecContext* context);
 		};
 	} // namespace ui
 } // namespace obsffmpeg

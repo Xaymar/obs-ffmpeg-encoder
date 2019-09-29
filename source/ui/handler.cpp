@@ -46,3 +46,5 @@ std::string obsffmpeg::ui::handler::export_for_ffmpeg(obs_data_t* settings, cons
 {
 	return std::string();
 }
+
+void obsffmpeg::ui::handler::process_avpacket(AVPacket& packet, const AVCodec* codec, AVCodecContext* context) {}
