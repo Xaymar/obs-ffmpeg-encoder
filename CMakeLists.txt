@@ -280,6 +280,8 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/swscale.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/tools.hpp"
 	"${PROJECT_SOURCE_DIR}/source/ffmpeg/tools.cpp"
+	"${PROJECT_SOURCE_DIR}/source/hwapi/base.hpp"
+	"${PROJECT_SOURCE_DIR}/source/hwapi/base.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ui/handler.hpp"
 	"${PROJECT_SOURCE_DIR}/source/ui/handler.cpp"
 	"${PROJECT_SOURCE_DIR}/source/ui/debug_handler.hpp"
@@ -293,6 +295,12 @@ set(PROJECT_PRIVATE
 	"${PROJECT_SOURCE_DIR}/source/ui/nvenc_hevc_handler.hpp"
 	"${PROJECT_SOURCE_DIR}/source/ui/nvenc_hevc_handler.cpp"
 )
+if(WIN32)
+	list(APPEND PROJECT_PRIVATE 
+		"${PROJECT_SOURCE_DIR}/source/hwapi/d3d11.hpp"
+		"${PROJECT_SOURCE_DIR}/source/hwapi/d3d11.cpp"
+	)
+endif()
 
 # Source Grouping
 source_group(TREE "${PROJECT_SOURCE_DIR}" PREFIX "Data Files" FILES ${PROJECT_DATA})
@@ -357,7 +365,7 @@ endif()
 
 # Link Libraries
 target_link_libraries(${PROJECT_NAME}
-	"${PROJECT_LIBRARIES}"
+	${PROJECT_LIBRARIES}
 	${FFMPEG_LIBRARIES}
 )
 
