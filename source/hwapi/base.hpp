@@ -25,6 +25,7 @@
 #include <list>
 #include <string>
 #include <utility>
+#include <memory>
 
 extern "C" {
 #pragma warning(push)
