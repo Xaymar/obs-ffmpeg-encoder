@@ -33,6 +33,12 @@ void obsffmpeg::ui::handler::get_defaults(obs_data_t* settings, const AVCodec* c
 
 void obsffmpeg::ui::handler::get_properties(obs_properties_t* props, const AVCodec* codec, AVCodecContext* context) {}
 
+obsffmpeg::hwapi::device obsffmpeg::ui::handler::find_hw_device(std::shared_ptr<obsffmpeg::hwapi::base> api,
+                                                                const AVCodec* codec, AVCodecContext* context)
+{
+	return obsffmpeg::hwapi::device();
+}
+
 void obsffmpeg::ui::handler::update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context) {}
 
 void obsffmpeg::ui::handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context) {}

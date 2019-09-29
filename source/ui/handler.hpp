@@ -22,6 +22,7 @@
 #pragma once
 
 #include <string>
+#include "hwapi/base.hpp"
 
 extern "C" {
 #include <obs.h>
@@ -50,6 +51,9 @@ namespace obsffmpeg {
 
 			virtual void get_properties(obs_properties_t* props, const AVCodec* codec,
 			                            AVCodecContext* context);
+
+			virtual obsffmpeg::hwapi::device find_hw_device(std::shared_ptr<obsffmpeg::hwapi::base> api,
+			                                                const AVCodec* codec, AVCodecContext* context);
 
 			virtual void update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 
