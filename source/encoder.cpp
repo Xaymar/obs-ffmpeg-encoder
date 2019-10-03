@@ -612,11 +612,6 @@ void obsffmpeg::encoder::initialize_sw(obs_data_t* settings)
 			     << (_swscale.is_source_full_range() ? "full" : "partial") << " range.";
 			throw std::runtime_error(sstr.str());
 		}
-
-		// Create Frame queue
-		_frame_queue.set_pixel_format(_context->pix_fmt);
-		_frame_queue.set_resolution(_context->width, _context->height);
-		_frame_queue.precache(2);
 	}
 }
 
@@ -653,6 +648,61 @@ void obsffmpeg::encoder::initialize_hw(obs_data_t* settings)
 
 	if (av_hwframe_ctx_init(_context->hw_frames_ctx) < 0)
 		throw std::runtime_error("Failed to initialize AVHWFramesContext.");
+}
+
+void obsffmpeg::encoder::push_free_frame(std::shared_ptr<AVFrame> frame)
+{
+	auto now = std::chrono::high_resolution_clock::now();
+	if (_free_frames.size() > 0) {
+		if ((now - _free_frames_last_used) < std::chrono::seconds(1)) {
+			_free_frames.push(frame);
+		}
+	} else {
+		_free_frames.push(frame);
+		_free_frames_last_used = std::chrono::high_resolution_clock::now();
+	}
+}
+
+std::shared_ptr<AVFrame> obsffmpeg::encoder::pop_free_frame()
+{
+	std::shared_ptr<AVFrame> frame;
+	if (_free_frames.size() > 0) {
+		// Re-use existing frames first.
+		frame = _free_frames.top();
+		_free_frames.pop();
+	} else {
+		if (_hwinst) {
+			frame = _hwinst->allocate_frame(_context->hw_frames_ctx);
+		} else {
+			frame = std::shared_ptr<AVFrame>(av_frame_alloc(), [](AVFrame* frame) {
+				av_frame_unref(frame);
+				av_frame_free(&frame);
+			});
+
+			frame->width  = _context->width;
+			frame->height = _context->height;
+			frame->format = _context->pix_fmt;
+
+			int res = av_frame_get_buffer(frame.get(), 32);
+			if (res < 0) {
+				throw std::runtime_error(ffmpeg::tools::get_error_description(res));
+			}
+		}
+	}
+
+	return frame;
+}
+
+void obsffmpeg::encoder::push_used_frame(std::shared_ptr<AVFrame> frame)
+{
+	_used_frames.push(frame);
+}
+
+std::shared_ptr<AVFrame> obsffmpeg::encoder::pop_used_frame()
+{
+	auto frame = _used_frames.front();
+	_used_frames.pop();
+	return frame;
 }
 
 obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool is_texture_encode)
@@ -700,14 +750,27 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 
 	// Log Encoder info
 	PLOG_INFO("[%s] Initializing...", _codec->name);
-	PLOG_INFO("[%s]   Video Input: %ldx%ld %s %s %s", _codec->name, _swscale.get_source_width(),
-	          _swscale.get_source_height(), ffmpeg::tools::get_pixel_format_name(_swscale.get_source_format()),
-	          ffmpeg::tools::get_color_space_name(_swscale.get_source_colorspace()),
-	          _swscale.is_source_full_range() ? "Full" : "Partial");
-	PLOG_INFO("[%s]   Video Output: %ldx%ld %s %s %s", _codec->name, _swscale.get_target_width(),
-	          _swscale.get_target_height(), ffmpeg::tools::get_pixel_format_name(_swscale.get_target_format()),
-	          ffmpeg::tools::get_color_space_name(_swscale.get_target_colorspace()),
-	          _swscale.is_target_full_range() ? "Full" : "Partial");
+	if (_hwinst) {
+		PLOG_INFO("[%s]   Video Input: %ldx%ld %s %s %s", _codec->name, _context->width, _context->height,
+		          ffmpeg::tools::get_pixel_format_name(_context->sw_pix_fmt),
+		          ffmpeg::tools::get_color_space_name(_context->colorspace),
+		          _swscale.is_source_full_range() ? "Full" : "Partial");
+		PLOG_INFO("[%s]   Video Output: %ldx%ld %s %s %s", _codec->name, _context->width, _context->height,
+		          ffmpeg::tools::get_pixel_format_name(_context->sw_pix_fmt),
+		          ffmpeg::tools::get_color_space_name(_context->colorspace),
+		          _swscale.is_target_full_range() ? "Full" : "Partial");
+	} else {
+		PLOG_INFO("[%s]   Video Input: %ldx%ld %s %s %s", _codec->name, _swscale.get_source_width(),
+		          _swscale.get_source_height(),
+		          ffmpeg::tools::get_pixel_format_name(_swscale.get_source_format()),
+		          ffmpeg::tools::get_color_space_name(_swscale.get_source_colorspace()),
+		          _swscale.is_source_full_range() ? "Full" : "Partial");
+		PLOG_INFO("[%s]   Video Output: %ldx%ld %s %s %s", _codec->name, _swscale.get_target_width(),
+		          _swscale.get_target_height(),
+		          ffmpeg::tools::get_pixel_format_name(_swscale.get_target_format()),
+		          ffmpeg::tools::get_color_space_name(_swscale.get_target_colorspace()),
+		          _swscale.is_target_full_range() ? "Full" : "Partial");
+	}
 	PLOG_INFO("[%s]   Framerate: %ld/%ld (%f FPS)", _codec->name, _context->time_base.den, _context->time_base.num,
 	          static_cast<double_t>(_context->time_base.den) / static_cast<double_t>(_context->time_base.num));
 	PLOG_INFO("[%s]   Custom Settings: %s", _codec->name, obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS));
@@ -744,8 +807,6 @@ obsffmpeg::encoder::~encoder()
 
 	av_packet_unref(&_current_packet);
 
-	_frame_queue.clear();
-	_frame_queue_used.clear();
 	_swscale.finalize();
 }
 
@@ -895,8 +956,9 @@ static inline void copy_data(encoder_frame* frame, AVFrame* vframe)
 
 bool obsffmpeg::encoder::video_encode(encoder_frame* frame, encoder_packet* packet, bool* received_packet)
 {
+	std::shared_ptr<AVFrame> vframe = pop_free_frame(); // Retrieve an empty frame.
+
 	// Convert frame.
-	std::shared_ptr<AVFrame> vframe = _frame_queue.pop(); // Retrieve an empty frame.
 	{
 #ifdef _DEBUG
 		ScopeProfiler profile("convert");
@@ -929,10 +991,6 @@ bool obsffmpeg::encoder::video_encode(encoder_frame* frame, encoder_packet* pack
 	if (!encode_avframe(vframe, packet, received_packet))
 		return false;
 
-	if (vframe != nullptr) {
-		_frame_queue.push(vframe);
-	}
-
 	return true;
 }
 
@@ -945,12 +1003,8 @@ bool obsffmpeg::encoder::video_encode_texture(uint32_t handle, int64_t pts, uint
 		return false;
 	}
 
-	std::shared_ptr<AVFrame> frame{av_frame_alloc(), [](void* ptr) {
-		                               av_frame_unref(reinterpret_cast<AVFrame*>(ptr));
-		                               av_frame_free(reinterpret_cast<AVFrame**>(&ptr));
-	                               }};
-		
-	std::shared_ptr<AVFrame> vframe = _hwinst->avframe_from_obs(_context->hw_frames_ctx, handle, lock_key, next_lock_key);
+	std::shared_ptr<AVFrame> vframe = pop_free_frame();
+	_hwinst->copy_from_obs(_context->hw_frames_ctx, handle, lock_key, next_lock_key, vframe);
 
 	vframe->color_range     = _context->color_range;
 	vframe->colorspace      = _context->colorspace;
@@ -971,62 +1025,61 @@ int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_pac
 	av_packet_unref(&_current_packet);
 
 	int res = avcodec_receive_packet(_context, &_current_packet);
-	if (res == 0) {
-		if (!_have_first_frame) {
-			if (_codec->id == AV_CODEC_ID_H264) {
-				uint8_t* tmp_packet;
-				uint8_t* tmp_header;
-				uint8_t* tmp_sei;
-				size_t   sz_packet, sz_header, sz_sei;
-
-				obs_extract_avc_headers(_current_packet.data, _current_packet.size, &tmp_packet,
-				                        &sz_packet, &tmp_header, &sz_header, &tmp_sei, &sz_sei);
-
-				if (sz_header) {
-					_extra_data.resize(sz_header);
-					std::memcpy(_extra_data.data(), tmp_header, sz_header);
-				}
-
-				if (sz_sei) {
-					_sei_data.resize(sz_sei);
-					std::memcpy(_sei_data.data(), tmp_sei, sz_sei);
-				}
-
-				// Not required, we only need the Extra Data and SEI Data anyway.
-				//std::memcpy(_current_packet.data, tmp_packet, sz_packet);
-				//_current_packet.size = static_cast<int>(sz_packet);
-
-				bfree(tmp_packet);
-				bfree(tmp_header);
-				bfree(tmp_sei);
-			} else if (_codec->id == AV_CODEC_ID_HEVC) {
-				obsffmpeg::codecs::hevc::extract_header_sei(_current_packet.data, _current_packet.size,
-				                                            _extra_data, _sei_data);
-			} else if (_context->extradata != nullptr) {
-				_extra_data.resize(_context->extradata_size);
-				std::memcpy(_extra_data.data(), _context->extradata, _context->extradata_size);
-			}
-			_have_first_frame = true;
-		}
-
-		// Allow Handler Post-Processing
-		if (_handler)
-			_handler->process_avpacket(_current_packet, _codec, _context);
-
-		packet->type          = OBS_ENCODER_VIDEO;
-		packet->pts           = _current_packet.pts;
-		packet->dts           = _current_packet.dts;
-		packet->data          = _current_packet.data;
-		packet->size          = _current_packet.size;
-		packet->keyframe      = !!(_current_packet.flags & AV_PKT_FLAG_KEY);
-		packet->drop_priority = packet->keyframe ? 0 : 1;
-		*received_packet      = true;
-
-		{
-			std::shared_ptr<AVFrame> uframe = _frame_queue_used.pop_only();
-			_frame_queue.push(uframe);
-		}
+	if (res != 0) {
+		return res;
 	}
+
+	if (!_have_first_frame) {
+		if (_codec->id == AV_CODEC_ID_H264) {
+			uint8_t* tmp_packet;
+			uint8_t* tmp_header;
+			uint8_t* tmp_sei;
+			size_t   sz_packet, sz_header, sz_sei;
+
+			obs_extract_avc_headers(_current_packet.data, _current_packet.size, &tmp_packet, &sz_packet,
+			                        &tmp_header, &sz_header, &tmp_sei, &sz_sei);
+
+			if (sz_header) {
+				_extra_data.resize(sz_header);
+				std::memcpy(_extra_data.data(), tmp_header, sz_header);
+			}
+
+			if (sz_sei) {
+				_sei_data.resize(sz_sei);
+				std::memcpy(_sei_data.data(), tmp_sei, sz_sei);
+			}
+
+			// Not required, we only need the Extra Data and SEI Data anyway.
+			//std::memcpy(_current_packet.data, tmp_packet, sz_packet);
+			//_current_packet.size = static_cast<int>(sz_packet);
+
+			bfree(tmp_packet);
+			bfree(tmp_header);
+			bfree(tmp_sei);
+		} else if (_codec->id == AV_CODEC_ID_HEVC) {
+			obsffmpeg::codecs::hevc::extract_header_sei(_current_packet.data, _current_packet.size,
+			                                            _extra_data, _sei_data);
+		} else if (_context->extradata != nullptr) {
+			_extra_data.resize(_context->extradata_size);
+			std::memcpy(_extra_data.data(), _context->extradata, _context->extradata_size);
+		}
+		_have_first_frame = true;
+	}
+
+	// Allow Handler Post-Processing
+	if (_handler)
+		_handler->process_avpacket(_current_packet, _codec, _context);
+
+	packet->type          = OBS_ENCODER_VIDEO;
+	packet->pts           = _current_packet.pts;
+	packet->dts           = _current_packet.dts;
+	packet->data          = _current_packet.data;
+	packet->size          = _current_packet.size;
+	packet->keyframe      = !!(_current_packet.flags & AV_PKT_FLAG_KEY);
+	packet->drop_priority = packet->keyframe ? 0 : 1;
+	*received_packet      = true;
+
+	push_free_frame(pop_used_frame());
 
 	return res;
 }
@@ -1034,19 +1087,14 @@ int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_pac
 int obsffmpeg::encoder::send_frame(std::shared_ptr<AVFrame> const frame)
 {
 	int res = avcodec_send_frame(_context, frame.get());
-	switch (res) {
-	case 0:
-		if (!_hwapi)
-			_frame_queue_used.push(frame);
-		_count_send_frames++;
-	case AVERROR(EAGAIN):
-	case AVERROR(EOF):
-		break;
+	if (res == 0) {
+		push_used_frame(frame);
 	}
+
 	return res;
 }
 
-bool obsffmpeg::encoder::encode_avframe(std::shared_ptr<AVFrame>& frame, encoder_packet* packet, bool* received_packet)
+bool obsffmpeg::encoder::encode_avframe(std::shared_ptr<AVFrame> frame, encoder_packet* packet, bool* received_packet)
 {
 #ifdef _DEBUG
 	ScopeProfiler profile("loop");
@@ -1126,6 +1174,9 @@ bool obsffmpeg::encoder::encode_avframe(std::shared_ptr<AVFrame>& frame, encoder
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
 	}
+
+	if (!sent_frame)
+		push_free_frame(frame);
 
 	return true;
 }

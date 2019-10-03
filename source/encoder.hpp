@@ -23,6 +23,8 @@
 
 #include <condition_variable>
 #include <mutex>
+#include <queue>
+#include <stack>
 #include <thread>
 #include <vector>
 #include "ffmpeg/avframe-queue.hpp"
@@ -81,19 +83,16 @@ namespace obsffmpeg {
 		obs_encoder_t*   _self;
 		encoder_factory* _factory;
 
-		const AVCodec*     _codec;
-		AVCodecContext*    _context;
-		AVHWFramesContext* _hwcontext;
+		const AVCodec*  _codec;
+		AVCodecContext* _context;
 
 		std::shared_ptr<obsffmpeg::ui::handler> _handler;
 
 		std::shared_ptr<obsffmpeg::hwapi::base>     _hwapi;
 		std::shared_ptr<obsffmpeg::hwapi::instance> _hwinst;
 
-		ffmpeg::avframe_queue _frame_queue;
-		ffmpeg::avframe_queue _frame_queue_used;
-		ffmpeg::swscale       _swscale;
-		AVPacket              _current_packet;
+		ffmpeg::swscale _swscale;
+		AVPacket        _current_packet;
 
 		int64_t _lag_in_frames;
 		int64_t _count_send_frames;
@@ -103,8 +102,19 @@ namespace obsffmpeg {
 		std::vector<uint8_t> _extra_data;
 		std::vector<uint8_t> _sei_data;
 
+		// Frame Stack and Queue
+		std::stack<std::shared_ptr<AVFrame>>           _free_frames;
+		std::queue<std::shared_ptr<AVFrame>>           _used_frames;
+		std::chrono::high_resolution_clock::time_point _free_frames_last_used;
+
 		void initialize_sw(obs_data_t* settings);
 		void initialize_hw(obs_data_t* settings);
+
+		void                     push_free_frame(std::shared_ptr<AVFrame> frame);
+		std::shared_ptr<AVFrame> pop_free_frame();
+
+		void                     push_used_frame(std::shared_ptr<AVFrame> frame);
+		std::shared_ptr<AVFrame> pop_used_frame();
 
 		public:
 		encoder(obs_data_t* settings, obs_encoder_t* encoder, bool is_texture_encode = false);
@@ -139,7 +149,7 @@ namespace obsffmpeg {
 
 		int send_frame(std::shared_ptr<AVFrame> frame);
 
-		bool encode_avframe(std::shared_ptr<AVFrame>& frame, struct encoder_packet* packet,
+		bool encode_avframe(std::shared_ptr<AVFrame> frame, struct encoder_packet* packet,
 		                    bool* received_packet);
 	};
 } // namespace obsffmpeg

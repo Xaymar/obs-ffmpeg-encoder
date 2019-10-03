@@ -23,9 +23,9 @@
 
 #include <cinttypes>
 #include <list>
+#include <memory>
 #include <string>
 #include <utility>
-#include <memory>
 
 extern "C" {
 #pragma warning(push)
@@ -60,7 +60,8 @@ namespace obsffmpeg {
 			virtual void copy_from_obs(AVBufferRef* frames, uint32_t handle, uint64_t lock_key,
 			                           uint64_t* next_lock_key, std::shared_ptr<AVFrame> frame) = 0;
 
-			virtual std::shared_ptr<AVFrame> avframe_from_obs(AVBufferRef* frames, uint32_t handle, uint64_t lock_key,
+			virtual std::shared_ptr<AVFrame> avframe_from_obs(AVBufferRef* frames, uint32_t handle,
+			                                                  uint64_t  lock_key,
 			                                                  uint64_t* next_lock_key) = 0;
 		};
 	} // namespace hwapi
