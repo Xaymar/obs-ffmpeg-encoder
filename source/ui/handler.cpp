@@ -29,6 +29,10 @@ void obsffmpeg::ui::handler::override_colorformat(AVPixelFormat& target_format, 
                                                   const AVCodec* codec, AVCodecContext* context)
 {}
 
+void obsffmpeg::ui::handler::override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
+                                                    AVCodecContext* context)
+{}
+
 void obsffmpeg::ui::handler::get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context) {}
 
 void obsffmpeg::ui::handler::get_properties(obs_properties_t* props, const AVCodec* codec, AVCodecContext* context) {}

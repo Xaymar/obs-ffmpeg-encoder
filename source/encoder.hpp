@@ -94,8 +94,8 @@ namespace obsffmpeg {
 		ffmpeg::swscale _swscale;
 		AVPacket        _current_packet;
 
-		int64_t _lag_in_frames;
-		int64_t _count_send_frames;
+		size_t _lag_in_frames;
+		size_t _count_send_frames;
 
 		// Extra Data
 		bool                 _have_first_frame;

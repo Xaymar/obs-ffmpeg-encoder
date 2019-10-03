@@ -878,6 +878,9 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 		                       nullptr, "=", ";");
 	}
 
+	if (_handler)
+		_handler->override_lag_in_frames(_lag_in_frames, settings, _codec, _context);
+
 	// Handler Logging
 	if (_handler)
 		_handler->log_options(settings, _codec, _context);
@@ -1102,7 +1105,7 @@ bool obsffmpeg::encoder::encode_avframe(std::shared_ptr<AVFrame> frame, encoder_
 
 	bool sent_frame  = false;
 	bool recv_packet = false;
-	bool should_lag  = (_lag_in_frames - _count_send_frames) <= 0;
+	bool should_lag  = (_count_send_frames >= _lag_in_frames);
 
 	auto loop_begin = std::chrono::high_resolution_clock::now();
 	auto loop_end   = loop_begin + std::chrono::milliseconds(50);

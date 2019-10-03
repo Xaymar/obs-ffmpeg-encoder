@@ -47,6 +47,9 @@ namespace obsffmpeg {
 			virtual void override_colorformat(AVPixelFormat& target_format, obs_data_t* settings,
 			                                  const AVCodec* codec, AVCodecContext* context);
 
+			virtual void override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
+			                                       AVCodecContext* context);
+
 			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 
 			virtual void get_properties(obs_properties_t* props, const AVCodec* codec,
