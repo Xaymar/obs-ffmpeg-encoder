@@ -146,7 +146,7 @@ AVBufferRef* obsffmpeg::hwapi::d3d11_instance::create_device_context()
 	AVD3D11VADeviceContext* d3d11va = reinterpret_cast<AVD3D11VADeviceContext*>(dctx->hwctx);
 
 	// TODO: Determine if these need an additional reference.
-	d3d11va->device         = _device;
+	d3d11va->device = _device;
 	d3d11va->device->AddRef();
 	d3d11va->device_context = _context;
 	d3d11va->device_context->AddRef();
@@ -157,20 +157,31 @@ AVBufferRef* obsffmpeg::hwapi::d3d11_instance::create_device_context()
 	return dctx_ref;
 }
 
-std::shared_ptr<AVFrame> obsffmpeg::hwapi::d3d11_instance::avframe_from_obs(AVBufferRef* frames, uint32_t handle,
-                                                                            uint64_t lock_key, uint64_t* next_lock_key)
+std::shared_ptr<AVFrame> obsffmpeg::hwapi::d3d11_instance::allocate_frame(AVBufferRef* frames)
 {
-	AVFrame*                      frame = av_frame_alloc();
+	auto frame = std::shared_ptr<AVFrame>(av_frame_alloc(), [](AVFrame* frame) {
+		av_frame_unref(frame);
+		av_frame_free(&frame);
+	});
+
+	if (av_hwframe_get_buffer(frames, frame.get(), 0) < 0) {
+		throw std::runtime_error("Failed to create AVFrame.");
+	}
+
+	return frame;
+}
+
+void obsffmpeg::hwapi::d3d11_instance::copy_from_obs(AVBufferRef* frames, uint32_t handle, uint64_t lock_key,
+                                                     uint64_t* next_lock_key, std::shared_ptr<AVFrame> frame)
+{
 	ATL::CComPtr<IDXGIKeyedMutex> mutex;
 	ATL::CComPtr<ID3D11Texture2D> input;
-	D3D11_TEXTURE2D_DESC          input_desc;
-	D3D11_TEXTURE2D_DESC          output_desc;
-	//ATL::CComPtr<ID3D11Texture2D> output;
 
 	if (FAILED(_device->OpenSharedResource(reinterpret_cast<HANDLE>(static_cast<uintptr_t>(handle)),
 	                                       __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&input)))) {
 		throw std::runtime_error("Failed to open shared texture resource.");
 	}
+
 	if (FAILED(input->QueryInterface(__uuidof(IDXGIKeyedMutex), reinterpret_cast<void**>(&mutex)))) {
 		throw std::runtime_error("Failed to retrieve mutex for texture resource.");
 	}
@@ -182,13 +193,6 @@ std::shared_ptr<AVFrame> obsffmpeg::hwapi::d3d11_instance::avframe_from_obs(AVBu
 	// Set some parameters on the input texture, and get its description.
 	UINT evict = input->GetEvictionPriority();
 	input->SetEvictionPriority(DXGI_RESOURCE_PRIORITY_MAXIMUM);
-	input->GetDesc(&input_desc);
-
-	if (av_hwframe_get_buffer(frames, frame, 0) < 0) {
-		throw std::runtime_error("Failed to create AVFrame.");
-	}
-
-	reinterpret_cast<ID3D11Texture2D*>(frame->data[0])->GetDesc(&output_desc);
 
 	// Clone the content of the input texture.
 	_context->CopyResource(reinterpret_cast<ID3D11Texture2D*>(frame->data[0]), input);
@@ -202,9 +206,12 @@ std::shared_ptr<AVFrame> obsffmpeg::hwapi::d3d11_instance::avframe_from_obs(AVBu
 
 	// TODO: Determine if this is necessary.
 	mutex->ReleaseSync(*next_lock_key);
+}
 
-	return std::shared_ptr<AVFrame>(frame, [](AVFrame* frame) {
-		av_frame_unref(frame);
-		av_frame_free(&frame);
-	});
+std::shared_ptr<AVFrame> obsffmpeg::hwapi::d3d11_instance::avframe_from_obs(AVBufferRef* frames, uint32_t handle,
+                                                                            uint64_t lock_key, uint64_t* next_lock_key)
+{
+	auto frame = this->allocate_frame(frames);
+	this->copy_from_obs(frames, handle, lock_key, next_lock_key, frame);
+	return frame;
 }

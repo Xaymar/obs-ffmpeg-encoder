@@ -21,13 +21,13 @@
 
 #include <atlutil.h>
 #include <d3d11.h>
+#include <d3d11_1.h>
 #include <dxgi.h>
-#include <windows.h>
 #include "base.hpp"
 
 namespace obsffmpeg {
 	namespace hwapi {
-		class d3d11 : public base {
+		class d3d11 : public ::obsffmpeg::hwapi::base {
 			typedef HRESULT(__stdcall* CreateDXGIFactory_t)(REFIID, void**);
 			typedef HRESULT(__stdcall* CreateDXGIFactory1_t)(REFIID, void**);
 			typedef HRESULT(__stdcall* D3D11CreateDevice_t)(_In_opt_ IDXGIAdapter*, D3D_DRIVER_TYPE,
@@ -55,7 +55,7 @@ namespace obsffmpeg {
 			    create(obsffmpeg::hwapi::device target) override;
 		};
 
-		class d3d11_instance : public instance {
+		class d3d11_instance : public ::obsffmpeg::hwapi::instance {
 			ATL::CComPtr<ID3D11Device>        _device;
 			ATL::CComPtr<ID3D11DeviceContext> _context;
 
@@ -65,9 +65,14 @@ namespace obsffmpeg {
 
 			virtual AVBufferRef* create_device_context() override;
 
+			virtual std::shared_ptr<AVFrame> allocate_frame(AVBufferRef* frames) override;
+
+			virtual void copy_from_obs(AVBufferRef* frames, uint32_t handle, uint64_t lock_key,
+			                           uint64_t* next_lock_key, std::shared_ptr<AVFrame> frame) override;
+
 			virtual std::shared_ptr<AVFrame> avframe_from_obs(AVBufferRef* frames, uint32_t handle,
 			                                                  uint64_t  lock_key,
-			                              uint64_t* next_lock_key) override;
+			                                                  uint64_t* next_lock_key) override;
 		};
 	} // namespace hwapi
 } // namespace obsffmpeg
