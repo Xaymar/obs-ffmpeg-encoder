@@ -85,6 +85,12 @@ void obsffmpeg::ui::nvenc_h264_handler::override_visible_name(const AVCodec*, st
 	name = "H.264/AVC Encoder (NVidia NVENC)";
 }
 
+void obsffmpeg::ui::nvenc_h264_handler::override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
+                                                               AVCodecContext* context)
+{
+	nvenc::override_lag_in_frames(lag, settings, codec, context);
+}
+
 void obsffmpeg::ui::nvenc_h264_handler::get_defaults(obs_data_t* settings, const AVCodec* codec,
                                                      AVCodecContext* context)
 {

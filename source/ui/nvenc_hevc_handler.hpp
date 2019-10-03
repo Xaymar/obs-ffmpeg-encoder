@@ -36,6 +36,9 @@ namespace obsffmpeg {
 			public:
 			virtual void override_visible_name(const AVCodec* codec, std::string& name) override;
 
+			virtual void override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
+			                                    AVCodecContext* context) override;
+
 			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec,
 			                          AVCodecContext* context) override;
 

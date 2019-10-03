@@ -131,6 +131,17 @@ std::map<b_ref_mode, std::string> obsffmpeg::nvenc::b_ref_mode_to_opt{
     {b_ref_mode::MIDDLE, "middle"},
 };
 
+void obsffmpeg::nvenc::override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
+                                              AVCodecContext* context)
+{
+	// With NVENC, the number of frames lagged before we get our first
+	// packet is determined by the number of b-frames. Threads, lookahead
+	// frames and various other settings are ignored.
+	// The minimum number of lagged frames is 1.
+
+	lag = 1ull + static_cast<size_t>(context->max_b_frames);
+}
+
 void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, const AVCodec*, AVCodecContext*)
 {
 	obs_data_set_default_int(settings, ST_PRESET, static_cast<int64_t>(preset::DEFAULT));

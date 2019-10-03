@@ -75,6 +75,9 @@ namespace obsffmpeg {
 
 		extern std::map<b_ref_mode, std::string> b_ref_mode_to_opt;
 
+		void override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
+		                            AVCodecContext* context);
+
 		void get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 
 		void get_properties_pre(obs_properties_t* props, const AVCodec* codec);
