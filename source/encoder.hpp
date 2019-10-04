@@ -52,7 +52,7 @@ namespace obsffmpeg {
 		std::string      uid;
 		std::string      codec;
 		std::string      readable_name;
-		obs_encoder_info oei;
+		obs_encoder_info oei = {0};
 	};
 
 	class encoder_factory {
@@ -68,9 +68,9 @@ namespace obsffmpeg {
 
 		void register_encoder();
 
-		void get_defaults(obs_data_t* settings);
+		void get_defaults(obs_data_t* settings, bool hw_encoder = false);
 
-		void get_properties(obs_properties_t* props);
+		void get_properties(obs_properties_t* props, bool hw_encoder = false);
 
 		const AVCodec* get_avcodec();
 
@@ -122,7 +122,7 @@ namespace obsffmpeg {
 
 		public: // OBS API
 		// Shared
-		void get_properties(obs_properties_t* props);
+		void get_properties(obs_properties_t* props, bool hw_encode = false);
 
 		bool update(obs_data_t* settings);
 

@@ -94,7 +94,7 @@ void obsffmpeg::ui::nvenc_hevc_handler::override_lag_in_frames(size_t& lag, obs_
 }
 
 void obsffmpeg::ui::nvenc_hevc_handler::get_defaults(obs_data_t* settings, const AVCodec* codec,
-                                                     AVCodecContext* context)
+                                                     AVCodecContext* context, bool)
 {
 	nvenc::get_defaults(settings, codec, context);
 
@@ -104,7 +104,7 @@ void obsffmpeg::ui::nvenc_hevc_handler::get_defaults(obs_data_t* settings, const
 }
 
 void obsffmpeg::ui::nvenc_hevc_handler::get_properties(obs_properties_t* props, const AVCodec* codec,
-                                                       AVCodecContext* context)
+                                                       AVCodecContext* context, bool)
 {
 	if (!context) {
 		this->get_encoder_properties(props, codec);

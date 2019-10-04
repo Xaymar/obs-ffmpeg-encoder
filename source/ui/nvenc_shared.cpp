@@ -131,7 +131,7 @@ std::map<b_ref_mode, std::string> obsffmpeg::nvenc::b_ref_mode_to_opt{
     {b_ref_mode::MIDDLE, "middle"},
 };
 
-void obsffmpeg::nvenc::override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
+void obsffmpeg::nvenc::override_lag_in_frames(size_t& lag, obs_data_t*, const AVCodec*,
                                               AVCodecContext* context)
 {
 	// With NVENC, the number of frames lagged before we get our first
@@ -689,7 +689,7 @@ void obsffmpeg::nvenc::log_options(obs_data_t* settings, const AVCodec* codec, A
 	bool     cfg_rc_quality     = obs_data_get_bool(settings, ST_RATECONTROL_QUALITY);
 	int64_t  cfg_rc_quality_min = obs_data_get_int(settings, ST_RATECONTROL_QUALITY_MINIMUM);
 	int64_t  cfg_rc_quality_max = obs_data_get_int(settings, ST_RATECONTROL_QUALITY_MAXIMUM);
-	double_t cfg_rc_quality_tgt = obs_data_get_int(settings, ST_RATECONTROL_QUALITY_TARGET);
+	double_t cfg_rc_quality_tgt = obs_data_get_double(settings, ST_RATECONTROL_QUALITY_TARGET) / 100.0 * 51.0;
 	int64_t  cfg_rc_qp_i        = obs_data_get_int(settings, ST_RATECONTROL_QP_I);
 	int64_t  cfg_rc_qp_p        = obs_data_get_int(settings, ST_RATECONTROL_QP_P);
 	int64_t  cfg_rc_qp_b        = obs_data_get_int(settings, ST_RATECONTROL_QP_B);

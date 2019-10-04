@@ -36,7 +36,7 @@ INITIALIZER(prores_aw_handler_init)
 };
 
 void obsffmpeg::ui::prores_aw_handler::override_colorformat(AVPixelFormat& target_format, obs_data_t* settings,
-                                                            const AVCodec* codec, AVCodecContext* context)
+                                                            const AVCodec* codec, AVCodecContext*)
 {
 	std::string profile = "";
 
@@ -60,13 +60,13 @@ void obsffmpeg::ui::prores_aw_handler::override_colorformat(AVPixelFormat& targe
 	}
 }
 
-void obsffmpeg::ui::prores_aw_handler::get_defaults(obs_data_t* settings, const AVCodec*, AVCodecContext*)
+void obsffmpeg::ui::prores_aw_handler::get_defaults(obs_data_t* settings, const AVCodec*, AVCodecContext*, bool)
 {
 	obs_data_set_default_int(settings, P_PRORES_PROFILE, 0);
 }
 
 void obsffmpeg::ui::prores_aw_handler::get_properties(obs_properties_t* props, const AVCodec* codec,
-                                                      AVCodecContext* context)
+                                                      AVCodecContext* context, bool)
 {
 	if (!context) {
 		auto p = obs_properties_add_list(props, P_PRORES_PROFILE, TRANSLATE(P_PRORES_PROFILE),
@@ -105,7 +105,7 @@ void obsffmpeg::ui::prores_aw_handler::update(obs_data_t* settings, const AVCode
 	context->profile = static_cast<int>(obs_data_get_int(settings, P_PRORES_PROFILE));
 }
 
-void obsffmpeg::ui::prores_aw_handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
+void obsffmpeg::ui::prores_aw_handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext*)
 {
 	for (auto ptr = codec->profiles; ptr->profile != FF_PROFILE_UNKNOWN; ptr++) {
 		if (ptr->profile == static_cast<int>(obs_data_get_int(settings, P_PRORES_PROFILE)))
@@ -113,7 +113,7 @@ void obsffmpeg::ui::prores_aw_handler::log_options(obs_data_t* settings, const A
 	}
 }
 
-void obsffmpeg::ui::prores_aw_handler::process_avpacket(AVPacket& packet, const AVCodec* codec, AVCodecContext* context)
+void obsffmpeg::ui::prores_aw_handler::process_avpacket(AVPacket& packet, const AVCodec*, AVCodecContext*)
 {
 	//FFmpeg Bug:
 	// When ProRes content is stored in Matroska, FFmpeg strips the size

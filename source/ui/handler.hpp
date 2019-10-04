@@ -50,10 +50,10 @@ namespace obsffmpeg {
 			virtual void override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
 			                                       AVCodecContext* context);
 
-			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
+			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context, bool hw_encode);
 
 			virtual void get_properties(obs_properties_t* props, const AVCodec* codec,
-			                            AVCodecContext* context);
+			                            AVCodecContext* context, bool hw_encode);
 
 			virtual obsffmpeg::hwapi::device find_hw_device(std::shared_ptr<obsffmpeg::hwapi::base> api,
 			                                                const AVCodec* codec, AVCodecContext* context);

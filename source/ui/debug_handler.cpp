@@ -35,7 +35,7 @@ extern "C" {
 #pragma warning(pop)
 }
 
-void obsffmpeg::ui::debug_handler::get_defaults(obs_data_t*, const AVCodec*, AVCodecContext*) {}
+void obsffmpeg::ui::debug_handler::get_defaults(obs_data_t*, const AVCodec*, AVCodecContext*, bool) {}
 
 template<typename T>
 std::string to_string(T value){};
@@ -64,7 +64,8 @@ std::string to_string(double_t value)
 	return std::string(buf.data(), buf.data() + buf.size());
 }
 
-void obsffmpeg::ui::debug_handler::get_properties(obs_properties_t*, const AVCodec* codec, AVCodecContext* context)
+void obsffmpeg::ui::debug_handler::get_properties(obs_properties_t*, const AVCodec* codec, AVCodecContext* context,
+                                                  bool)
 {
 	if (context)
 		return;

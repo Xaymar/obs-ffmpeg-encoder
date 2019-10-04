@@ -39,11 +39,11 @@ namespace obsffmpeg {
 			virtual void override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
 			                                    AVCodecContext* context) override;
 
-			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec,
-			                          AVCodecContext* context) override;
+			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context,
+			                          bool hw_encode) override;
 
 			virtual void get_properties(obs_properties_t* props, const AVCodec* codec,
-			                            AVCodecContext* context) override;
+			                            AVCodecContext* context, bool hw_encode) override;
 
 			virtual void update(obs_data_t* settings, const AVCodec* codec,
 			                    AVCodecContext* context) override;

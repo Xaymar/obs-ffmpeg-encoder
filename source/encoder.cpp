@@ -147,6 +147,17 @@ static void _get_defaults(obs_data_t* settings, void* type_data) noexcept try {
 	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
 };
 
+static void _get_defaults_texture(obs_data_t* settings, void* type_data) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, settings, type_data);
+#endif
+	reinterpret_cast<obsffmpeg::encoder_factory*>(type_data)->get_defaults(settings, true);
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+};
+
 static obs_properties_t* _get_properties(void* ptr, void* type_data) noexcept try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, ptr, type_data);
@@ -157,6 +168,26 @@ static obs_properties_t* _get_properties(void* ptr, void* type_data) noexcept tr
 	}
 	if (ptr != nullptr) {
 		reinterpret_cast<obsffmpeg::encoder*>(ptr)->get_properties(props);
+	}
+	return props;
+} catch (const std::exception& ex) {
+	PLOG_ERROR("Unexpected exception in function '%s': %s.", __FUNCTION_NAME__, ex.what());
+	return reinterpret_cast<obs_properties_t*>(0);
+} catch (...) {
+	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
+	return reinterpret_cast<obs_properties_t*>(0);
+}
+
+static obs_properties_t* _get_properties_texture(void* ptr, void* type_data) noexcept try {
+#ifdef DEBUG_CALL_ORDER
+	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, ptr, type_data);
+#endif
+	obs_properties_t* props = obs_properties_create();
+	if (type_data != nullptr) {
+		reinterpret_cast<obsffmpeg::encoder_factory*>(type_data)->get_properties(props, true);
+	}
+	if (ptr != nullptr) {
+		reinterpret_cast<obsffmpeg::encoder*>(ptr)->get_properties(props, true);
 	}
 	return props;
 } catch (const std::exception& ex) {
@@ -384,8 +415,10 @@ void obsffmpeg::encoder_factory::register_encoder()
 	info.oei.type_data = this;
 
 	if (ffmpeg::tools::can_hardware_encode(avcodec_ptr)) {
-		info.oei.create         = _create_texture;
-		info.oei.encode_texture = _encode_texture;
+		info.oei.create          = _create_texture;
+		info.oei.encode_texture  = _encode_texture;
+		info.oei.get_defaults2   = _get_defaults_texture;
+		info.oei.get_properties2 = _get_properties_texture;
 
 		info_fallback.oei.type            = info.oei.type;
 		info_fallback.oei.create          = _create;
@@ -413,10 +446,10 @@ void obsffmpeg::encoder_factory::register_encoder()
 	           avcodec_ptr->name, avcodec_ptr->long_name, avcodec_ptr->capabilities);
 }
 
-void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings)
+void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings, bool hw_encode)
 {
 	if (_handler)
-		_handler->get_defaults(settings, avcodec_ptr, nullptr);
+		_handler->get_defaults(settings, avcodec_ptr, nullptr, hw_encode);
 
 	if ((avcodec_ptr->capabilities & AV_CODEC_CAP_INTRA_ONLY) == 0) {
 		obs_data_set_default_int(settings, S_KEYFRAMES_INTERVALTYPE, 0);
@@ -427,8 +460,11 @@ void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings)
 	{ // Integrated Options
 		// FFmpeg
 		obs_data_set_default_string(settings, ST_FFMPEG_CUSTOMSETTINGS, "");
-		obs_data_set_default_int(settings, ST_FFMPEG_COLORFORMAT, static_cast<int64_t>(AV_PIX_FMT_NONE));
-		obs_data_set_default_int(settings, ST_FFMPEG_THREADS, 0);
+		if (!hw_encode) {
+			obs_data_set_default_int(settings, ST_FFMPEG_COLORFORMAT,
+			                         static_cast<int64_t>(AV_PIX_FMT_NONE));
+			obs_data_set_default_int(settings, ST_FFMPEG_THREADS, 0);
+		}
 		obs_data_set_default_int(settings, ST_FFMPEG_STANDARDCOMPLIANCE, FF_COMPLIANCE_STRICT);
 	}
 }
@@ -446,10 +482,10 @@ static bool modified_keyframes(obs_properties_t* props, obs_property_t*, obs_dat
 	return false;
 }
 
-void obsffmpeg::encoder_factory::get_properties(obs_properties_t* props)
+void obsffmpeg::encoder_factory::get_properties(obs_properties_t* props, bool hw_encode)
 {
 	if (_handler)
-		_handler->get_properties(props, avcodec_ptr, nullptr);
+		_handler->get_properties(props, avcodec_ptr, nullptr, hw_encode);
 
 	if ((avcodec_ptr->capabilities & AV_CODEC_CAP_INTRA_ONLY) == 0) {
 		// Key-Frame Options
@@ -498,21 +534,25 @@ void obsffmpeg::encoder_factory::get_properties(obs_properties_t* props)
 			                            obs_text_type::OBS_TEXT_DEFAULT);
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_CUSTOMSETTINGS)));
 		}
-		if (avcodec_ptr->pix_fmts) {
-			auto p = obs_properties_add_list(grp, ST_FFMPEG_COLORFORMAT, TRANSLATE(ST_FFMPEG_COLORFORMAT),
-			                                 OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-			obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_COLORFORMAT)));
-			obs_property_list_add_int(p, TRANSLATE(S_STATE_AUTOMATIC),
-			                          static_cast<int64_t>(AV_PIX_FMT_NONE));
-			for (auto ptr = avcodec_ptr->pix_fmts; *ptr != AV_PIX_FMT_NONE; ptr++) {
-				obs_property_list_add_int(p, ffmpeg::tools::get_pixel_format_name(*ptr),
-				                          static_cast<int64_t>(*ptr));
+		if (!hw_encode) {
+			if (avcodec_ptr->pix_fmts) {
+				auto p = obs_properties_add_list(grp, ST_FFMPEG_COLORFORMAT,
+				                                 TRANSLATE(ST_FFMPEG_COLORFORMAT), OBS_COMBO_TYPE_LIST,
+				                                 OBS_COMBO_FORMAT_INT);
+				obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_COLORFORMAT)));
+				obs_property_list_add_int(p, TRANSLATE(S_STATE_AUTOMATIC),
+				                          static_cast<int64_t>(AV_PIX_FMT_NONE));
+				for (auto ptr = avcodec_ptr->pix_fmts; *ptr != AV_PIX_FMT_NONE; ptr++) {
+					obs_property_list_add_int(p, ffmpeg::tools::get_pixel_format_name(*ptr),
+					                          static_cast<int64_t>(*ptr));
+				}
 			}
-		}
-		if (avcodec_ptr->capabilities & (AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_SLICE_THREADS)) {
-			auto p = obs_properties_add_int_slider(grp, ST_FFMPEG_THREADS, TRANSLATE(ST_FFMPEG_THREADS), 0,
-			                                       std::thread::hardware_concurrency() * 2, 1);
-			obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_THREADS)));
+			if (avcodec_ptr->capabilities & (AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_SLICE_THREADS)) {
+				auto p =
+				    obs_properties_add_int_slider(grp, ST_FFMPEG_THREADS, TRANSLATE(ST_FFMPEG_THREADS),
+				                                  0, std::thread::hardware_concurrency() * 2, 1);
+				obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_THREADS)));
+			}
 		}
 		{
 			auto p = obs_properties_add_list(grp, ST_FFMPEG_STANDARDCOMPLIANCE,
@@ -615,7 +655,7 @@ void obsffmpeg::encoder::initialize_sw(obs_data_t* settings)
 	}
 }
 
-void obsffmpeg::encoder::initialize_hw(obs_data_t* settings)
+void obsffmpeg::encoder::initialize_hw(obs_data_t*)
 {
 	// Initialize Video Encoding
 	auto voi = video_output_get_info(obs_encoder_video(_self));
@@ -810,10 +850,10 @@ obsffmpeg::encoder::~encoder()
 	_swscale.finalize();
 }
 
-void obsffmpeg::encoder::get_properties(obs_properties_t* props)
+void obsffmpeg::encoder::get_properties(obs_properties_t* props, bool hw_encode)
 {
 	if (_handler)
-		_handler->get_properties(props, _codec, _context);
+		_handler->get_properties(props, _codec, _context, hw_encode);
 
 	obs_property_set_enabled(obs_properties_get(props, S_KEYFRAMES), false);
 	obs_property_set_enabled(obs_properties_get(props, S_KEYFRAMES_INTERVALTYPE), false);
@@ -832,8 +872,8 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 	_context->strict_std_compliance = static_cast<int>(obs_data_get_int(settings, ST_FFMPEG_STANDARDCOMPLIANCE));
 	_context->debug                 = 0;
 	/// Threading
-	if (_codec->capabilities
-	    & (AV_CODEC_CAP_AUTO_THREADS | AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_SLICE_THREADS)) {
+	if (_codec->capabilities & (AV_CODEC_CAP_AUTO_THREADS | AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_SLICE_THREADS)
+	    && !_hwinst) {
 		if (_codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
 			_context->thread_type |= FF_THREAD_FRAME;
 		}
@@ -848,6 +888,10 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 			_context->thread_count = std::thread::hardware_concurrency();
 			_lag_in_frames         = _context->thread_count;
 		}
+	} else {
+		_context->thread_count = 1;
+		_context->thread_type  = 0;
+		_lag_in_frames         = 1;
 	}
 
 	if (_handler)

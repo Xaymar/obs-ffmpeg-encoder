@@ -171,7 +171,7 @@ std::shared_ptr<AVFrame> obsffmpeg::hwapi::d3d11_instance::allocate_frame(AVBuff
 	return frame;
 }
 
-void obsffmpeg::hwapi::d3d11_instance::copy_from_obs(AVBufferRef* frames, uint32_t handle, uint64_t lock_key,
+void obsffmpeg::hwapi::d3d11_instance::copy_from_obs(AVBufferRef*, uint32_t handle, uint64_t lock_key,
                                                      uint64_t* next_lock_key, std::shared_ptr<AVFrame> frame)
 {
 	ATL::CComPtr<IDXGIKeyedMutex> mutex;
