@@ -279,106 +279,6 @@ std::vector<AVPixelFormat> ffmpeg::tools::get_software_formats(const AVPixelForm
 	return std::move(fmts);
 }
 
-static std::map<std::pair<AVPixelFormat, AVPixelFormat>, double_t> format_compatibility = {
-    {{AV_PIX_FMT_NV12, AV_PIX_FMT_NV12}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_NV12, AV_PIX_FMT_NV21}, 65535.0},
-
-    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUVA420P}, 65535.0},
-    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P9}, 58981.5},
-    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P10}, 53083.35},
-    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P12}, 47775.015},
-    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P14}, 42997.5135},
-    {{AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P16}, 38697.76215},
-
-    {{AV_PIX_FMT_YUVA420P, AV_PIX_FMT_YUVA420P}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_YUVA420P, AV_PIX_FMT_YUVA420P9}, 65535.0},
-    {{AV_PIX_FMT_YUVA420P, AV_PIX_FMT_YUVA420P10}, 58981.5},
-    {{AV_PIX_FMT_YUVA420P, AV_PIX_FMT_YUVA420P16}, 53083.35},
-    {{AV_PIX_FMT_YUVA420P, AV_PIX_FMT_YUV420P}, 32767.0},
-
-    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUVA422P}, 65535.0},
-    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P9}, 58981.5},
-    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P10}, 53083.35},
-    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P12}, 47775.015},
-    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P14}, 42997.5135},
-    {{AV_PIX_FMT_YUV422P, AV_PIX_FMT_YUV422P16}, 38697.76215},
-
-    {{AV_PIX_FMT_YUVA422P, AV_PIX_FMT_YUVA422P}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA422P9}, 65535.0},
-    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA422P10}, 58981.5},
-    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA422P16}, 53083.35},
-    {{AV_PIX_FMT_YUVA422P, AV_PIX_FMT_YUV422P}, 32767.0},
-
-    {{AV_PIX_FMT_YVYU422, AV_PIX_FMT_YVYU422}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_YVYU422, AV_PIX_FMT_YUYV422}, 65535.0},
-
-    {{AV_PIX_FMT_UYVY422, AV_PIX_FMT_UYVY422}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_UYVY422, AV_PIX_FMT_YVYU422}, 65535.0},
-
-    {{AV_PIX_FMT_YUYV422, AV_PIX_FMT_YUYV422}, std::numeric_limits<double_t>::max()},
-
-    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUVA444P}, 65535.0},
-    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P9}, 58981.5},
-    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P10}, 53083.35},
-    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P12}, 47775.015},
-    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P14}, 42997.5135},
-    {{AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV444P16}, 38697.76215},
-
-    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA444P}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA444P9}, 65535.0},
-    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA444P10}, 58981.5},
-    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUVA444P16}, 53083.35},
-    {{AV_PIX_FMT_YUVA444P, AV_PIX_FMT_YUV444P}, 32767.0},
-
-    {{AV_PIX_FMT_RGBA, AV_PIX_FMT_RGBA}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_RGBA, AV_PIX_FMT_RGB0}, 65535.0},
-    {{AV_PIX_FMT_RGBA, AV_PIX_FMT_0RGB}, 32767.0},
-    {{AV_PIX_FMT_RGBA, AV_PIX_FMT_RGB24}, 16384.0},
-
-    {{AV_PIX_FMT_BGRA, AV_PIX_FMT_BGRA}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_BGRA, AV_PIX_FMT_BGR0}, 65535.0},
-    {{AV_PIX_FMT_BGRA, AV_PIX_FMT_0BGR}, 32767.0},
-    {{AV_PIX_FMT_BGRA, AV_PIX_FMT_BGR24}, 16384.0},
-
-    {{AV_PIX_FMT_BGR0, AV_PIX_FMT_BGR0}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_BGR0, AV_PIX_FMT_BGRA}, 65535.0},
-    {{AV_PIX_FMT_BGR0, AV_PIX_FMT_BGR24}, 32767.0},
-
-    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY8}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY9}, 65535.0},
-    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY10}, 58981.5},
-    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY12}, 53083.35},
-    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY14}, 47775.015},
-    {{AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAY16}, 42997.5135},
-
-    {{AV_PIX_FMT_BGR24, AV_PIX_FMT_BGR24}, std::numeric_limits<double_t>::max()},
-    {{AV_PIX_FMT_BGR24, AV_PIX_FMT_RGB24}, 32767.0},
-};
-
-AVPixelFormat ffmpeg::tools::get_best_compatible_format(const AVPixelFormat* list, AVPixelFormat source)
-{
-	double_t      score = std::numeric_limits<double_t>::min();
-	AVPixelFormat best  = source;
-
-	for (auto fmt = list; fmt && (*fmt != AV_PIX_FMT_NONE); fmt++) {
-		auto found = format_compatibility.find(std::pair{source, *fmt});
-		if (found != format_compatibility.end() && (score < found->second)) {
-			score = found->second;
-			best  = *fmt;
-		}
-	}
-
-	if (score <= 0) {
-		int data_loss = 0;
-		return avcodec_find_best_pix_fmt_of_list(list, source, 0, &data_loss);
-	}
-
-	return best;
-}
-
 void ffmpeg::tools::setup_obs_color(video_colorspace colorspace, video_range_type range, AVCodecContext* context)
 {
 	std::map<video_colorspace, std::tuple<AVColorSpace, AVColorPrimaries, AVColorTransferCharacteristic>>
@@ -409,5 +309,5 @@ void ffmpeg::tools::setup_obs_color(video_colorspace colorspace, video_range_typ
 	}
 
 	// Downscaling should result in downscaling, not pixelation
-	context->chroma_sample_location = AVCHROMA_LOC_CENTER; 
+	context->chroma_sample_location = AVCHROMA_LOC_CENTER;
 }

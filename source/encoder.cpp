@@ -600,8 +600,7 @@ void obsffmpeg::encoder::initialize_sw(obs_data_t* settings)
 		    static_cast<AVPixelFormat>(obs_data_get_int(settings, ST_FFMPEG_COLORFORMAT));
 		if (_pixfmt_target == AV_PIX_FMT_NONE) {
 			// Find the best conversion format.
-			std::vector<AVPixelFormat> fmts = ffmpeg::tools::get_software_formats(_codec->pix_fmts);
-			_pixfmt_target = ffmpeg::tools::get_best_compatible_format(fmts.data(), _pixfmt_source);
+			_pixfmt_target = ffmpeg::tools::get_least_lossy_format(_codec->pix_fmts, _pixfmt_source);
 
 			if (_handler) // Allow Handler to override the automatic color format for sanity reasons.
 				_handler->override_colorformat(_pixfmt_target, settings, _codec, _context);
