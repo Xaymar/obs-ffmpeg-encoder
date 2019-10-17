@@ -325,6 +325,7 @@ add_library(${PROJECT_NAME} MODULE
 	${PROJECT_GENERATED}
 	${PROJECT_PRIVATE}
 	${PROJECT_DATA}
+	${PROJECT_TEMPLATES}
 )
 
 # Include Directories
