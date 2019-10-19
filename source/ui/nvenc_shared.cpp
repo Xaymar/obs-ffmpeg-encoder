@@ -20,6 +20,7 @@
 // SOFTWARE.
 
 #include "nvenc_shared.hpp"
+#include <algorithm>
 #include "codecs/hevc.hpp"
 #include "plugin.hpp"
 #include "strings.hpp"
@@ -131,15 +132,17 @@ std::map<b_ref_mode, std::string> obsffmpeg::nvenc::b_ref_mode_to_opt{
     {b_ref_mode::MIDDLE, "middle"},
 };
 
-void obsffmpeg::nvenc::override_lag_in_frames(size_t& lag, obs_data_t*, const AVCodec*,
-                                              AVCodecContext* context)
+void obsffmpeg::nvenc::override_lag_in_frames(size_t& lag, obs_data_t*, const AVCodec*, AVCodecContext* context)
 {
 	// With NVENC, the number of frames lagged before we get our first
 	// packet is determined by the number of b-frames. Threads, lookahead
 	// frames and various other settings are ignored.
 	// The minimum number of lagged frames is 1.
 
-	lag = 1ull + static_cast<size_t>(context->max_b_frames);
+	int64_t rcla = 0;
+	av_opt_get_int(context, "rc-lookahead", AV_OPT_SEARCH_CHILDREN, &rcla);
+
+	lag = static_cast<size_t>(std::max(1ll + static_cast<int64_t>(context->max_b_frames), rcla));
 }
 
 void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, const AVCodec*, AVCodecContext*)
