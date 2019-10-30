@@ -37,6 +37,13 @@ jobs:
       run: |
         mkdir build/package
         node ./ci/packager.js
+    - name: "Package Installer (Prereqs)"
+      run: |
+        curl "-kL" "https://cdn.xaymar.com/ci/innosetup-6.0.3.exe" "-f" "--retry" "5" "-o" "inno.exe"
+        .\inno.exe /VERYSILENT /SP- /SUPPRESSMSGBOXES /NORESTART
+    - name: "Package Installer (Compile)"
+      run: |
+        & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' /Qp ".\build\64\installer.iss"
     - name: "Upload Artifacts"
       uses: actions/upload-artifact@v1
       with:

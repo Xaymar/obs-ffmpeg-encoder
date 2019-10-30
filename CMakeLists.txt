@@ -116,18 +116,27 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules/")
 configure_file(
 	"${PROJECT_SOURCE_DIR}/cmake/version.hpp.in"
 	"${PROJECT_BINARY_DIR}/source/version.hpp"
+	@ONLY
 )
 configure_file(
 	"${PROJECT_SOURCE_DIR}/cmake/module.cpp.in"
 	"${PROJECT_BINARY_DIR}/source/module.cpp"
+	@ONLY
 )
 
 # Windows
 if (WIN32)
 	## Installer (InnoSetup)
+	get_filename_component(ISS_FILES_DIR "${CMAKE_INSTALL_PREFIX}" ABSOLUTE)
+	file(TO_NATIVE_PATH "${ISS_FILES_DIR}" ISS_FILES_DIR)
+	get_filename_component(ISS_PACKAGE_DIR "${CMAKE_PACKAGE_PREFIX}" ABSOLUTE)
+	file(TO_NATIVE_PATH "${ISS_PACKAGE_DIR}" ISS_PACKAGE_DIR)
+	get_filename_component(ISS_SOURCE_DIR "${PROJECT_SOURCE_DIR}" ABSOLUTE)
+	file(TO_NATIVE_PATH "${ISS_SOURCE_DIR}" ISS_SOURCE_DIR)
 	configure_file(
 		"${PROJECT_SOURCE_DIR}/cmake/installer.iss.in"
 		"${PROJECT_BINARY_DIR}/installer.iss"
+		@ONLY
 	)
 
 	# Windows Specific Resource Definition
