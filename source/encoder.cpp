@@ -621,8 +621,8 @@ void obsffmpeg::encoder::initialize_sw(obs_data_t* settings)
 			}
 		}
 
-		_context->width  = voi->width;
-		_context->height = voi->height;
+		_context->width  = static_cast<int>(obs_encoder_get_width(_self));
+		_context->height = static_cast<int>(obs_encoder_get_height(_self));
 		ffmpeg::tools::setup_obs_color(voi->colorspace, voi->range, _context);
 
 		_context->pix_fmt                 = _pixfmt_target;
