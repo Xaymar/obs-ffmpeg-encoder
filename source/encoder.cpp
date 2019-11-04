@@ -322,7 +322,7 @@ obsffmpeg::encoder_factory::encoder_factory(const AVCodec* codec) : avcodec_ptr(
 	_handler = obsffmpeg::find_codec_handler(avcodec_ptr->name);
 
 	// Unique Id is FFmpeg name.
-	info.uid = avcodec_ptr->name;
+	info.uid = std::string("obs-ffmpeg-encoder_") + avcodec_ptr->name;
 
 	// Also generate a human readable name while we're at it.
 	{
