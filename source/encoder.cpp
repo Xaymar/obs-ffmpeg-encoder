@@ -23,6 +23,7 @@
 #include <iomanip>
 #include <set>
 #include <sstream>
+#include <stack>
 #include <thread>
 #include <util/profiler.hpp>
 #include <vector>
@@ -66,7 +67,8 @@ extern "C" {
 
 enum class keyframe_type { SECONDS, FRAMES };
 
-static void* _create(obs_data_t* settings, obs_encoder_t* encoder) noexcept try {
+static void* _create(obs_data_t* settings, obs_encoder_t* encoder) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, settings, encoder);
 #endif
@@ -79,7 +81,8 @@ static void* _create(obs_data_t* settings, obs_encoder_t* encoder) noexcept try 
 	return nullptr;
 }
 
-static void* _create_texture(obs_data_t* settings, obs_encoder_t* encoder) noexcept try {
+static void* _create_texture(obs_data_t* settings, obs_encoder_t* encoder) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, settings, encoder);
 #endif
@@ -98,7 +101,8 @@ static void* _create_texture(obs_data_t* settings, obs_encoder_t* encoder) noexc
 	return nullptr;
 }
 
-static void _destroy(void* ptr) noexcept try {
+static void _destroy(void* ptr) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX", __FUNCTION_NAME__, ptr);
 #endif
@@ -110,7 +114,8 @@ static void _destroy(void* ptr) noexcept try {
 	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
 }
 
-static const char* _get_name(void* type_data) noexcept try {
+static const char* _get_name(void* type_data) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX", __FUNCTION_NAME__, type_data);
 #endif
@@ -123,7 +128,8 @@ static const char* _get_name(void* type_data) noexcept try {
 	return nullptr;
 }
 
-static const char* _get_name_fallback(void* type_data) noexcept try {
+static const char* _get_name_fallback(void* type_data) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX", __FUNCTION_NAME__, type_data);
 #endif
@@ -136,7 +142,8 @@ static const char* _get_name_fallback(void* type_data) noexcept try {
 	return nullptr;
 }
 
-static void _get_defaults(obs_data_t* settings, void* type_data) noexcept try {
+static void _get_defaults(obs_data_t* settings, void* type_data) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, settings, type_data);
 #endif
@@ -147,7 +154,8 @@ static void _get_defaults(obs_data_t* settings, void* type_data) noexcept try {
 	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
 };
 
-static void _get_defaults_texture(obs_data_t* settings, void* type_data) noexcept try {
+static void _get_defaults_texture(obs_data_t* settings, void* type_data) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, settings, type_data);
 #endif
@@ -158,7 +166,8 @@ static void _get_defaults_texture(obs_data_t* settings, void* type_data) noexcep
 	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
 };
 
-static obs_properties_t* _get_properties(void* ptr, void* type_data) noexcept try {
+static obs_properties_t* _get_properties(void* ptr, void* type_data) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, ptr, type_data);
 #endif
@@ -178,7 +187,8 @@ static obs_properties_t* _get_properties(void* ptr, void* type_data) noexcept tr
 	return reinterpret_cast<obs_properties_t*>(0);
 }
 
-static obs_properties_t* _get_properties_texture(void* ptr, void* type_data) noexcept try {
+static obs_properties_t* _get_properties_texture(void* ptr, void* type_data) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, ptr, type_data);
 #endif
@@ -198,7 +208,8 @@ static obs_properties_t* _get_properties_texture(void* ptr, void* type_data) noe
 	return reinterpret_cast<obs_properties_t*>(0);
 }
 
-static bool _update(void* ptr, obs_data_t* settings) noexcept try {
+static bool _update(void* ptr, obs_data_t* settings) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, ptr, settings);
 #endif
@@ -211,7 +222,8 @@ static bool _update(void* ptr, obs_data_t* settings) noexcept try {
 	return false;
 }
 
-static bool _get_sei_data(void* ptr, uint8_t** sei_data, size_t* size) noexcept try {
+static bool _get_sei_data(void* ptr, uint8_t** sei_data, size_t* size) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX %llX", __FUNCTION_NAME__, ptr, sei_data, size);
 #endif
@@ -224,7 +236,8 @@ static bool _get_sei_data(void* ptr, uint8_t** sei_data, size_t* size) noexcept 
 	return false;
 }
 
-static bool _get_extra_data(void* ptr, uint8_t** extra_data, size_t* size) noexcept try {
+static bool _get_extra_data(void* ptr, uint8_t** extra_data, size_t* size) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX %llX", __FUNCTION_NAME__, ptr, extra_data, size);
 #endif
@@ -237,7 +250,8 @@ static bool _get_extra_data(void* ptr, uint8_t** extra_data, size_t* size) noexc
 	return false;
 }
 
-static void _get_video_info(void* ptr, struct video_scale_info* info) noexcept try {
+static void _get_video_info(void* ptr, struct video_scale_info* info) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, ptr, info);
 #endif
@@ -249,7 +263,8 @@ static void _get_video_info(void* ptr, struct video_scale_info* info) noexcept t
 }
 
 static bool _encode(void* ptr, struct encoder_frame* frame, struct encoder_packet* packet,
-                    bool* received_packet) noexcept try {
+                    bool* received_packet) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX %llX %llX", __FUNCTION_NAME__, ptr, frame, packet, received_packet);
 #endif
@@ -263,7 +278,8 @@ static bool _encode(void* ptr, struct encoder_frame* frame, struct encoder_packe
 }
 
 static bool _encode_texture(void* ptr, uint32_t handle, int64_t pts, uint64_t lock_key, uint64_t* next_key,
-                            struct encoder_packet* packet, bool* received_packet) noexcept try {
+                            struct encoder_packet* packet, bool* received_packet) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %lI %llI %llU %llX %llX %llX", __FUNCTION_NAME__, ptr, handle, pts, lock_key, next_key, packet,
 	          received_packet);
@@ -278,7 +294,8 @@ static bool _encode_texture(void* ptr, uint32_t handle, int64_t pts, uint64_t lo
 	return false;
 }
 
-static void _get_audio_info(void* ptr, struct audio_convert_info* info) noexcept try {
+static void _get_audio_info(void* ptr, struct audio_convert_info* info) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX", __FUNCTION_NAME__, ptr, info);
 #endif
@@ -289,7 +306,8 @@ static void _get_audio_info(void* ptr, struct audio_convert_info* info) noexcept
 	PLOG_ERROR("Unexpected exception in function '%s'.", __FUNCTION_NAME__);
 }
 
-static size_t _get_frame_size(void* ptr) noexcept try {
+static size_t _get_frame_size(void* ptr) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX", __FUNCTION_NAME__, ptr);
 #endif
@@ -303,7 +321,8 @@ static size_t _get_frame_size(void* ptr) noexcept try {
 }
 
 static bool _encode_audio(void* ptr, struct encoder_frame* frame, struct encoder_packet* packet,
-                          bool* received_packet) noexcept try {
+                          bool* received_packet) noexcept
+try {
 #ifdef DEBUG_CALL_ORDER
 	PLOG_INFO("%s %llX %llX %llX %llX", __FUNCTION_NAME__, ptr, frame, packet, received_packet);
 #endif
@@ -469,7 +488,8 @@ void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings, bool hw_enco
 	}
 }
 
-static bool modified_keyframes(obs_properties_t* props, obs_property_t*, obs_data_t* settings) try {
+static bool modified_keyframes(obs_properties_t* props, obs_property_t*, obs_data_t* settings)
+try {
 	bool is_seconds = obs_data_get_int(settings, S_KEYFRAMES_INTERVALTYPE) == 0;
 	obs_property_set_visible(obs_properties_get(props, S_KEYFRAMES_INTERVAL_FRAMES), !is_seconds);
 	obs_property_set_visible(obs_properties_get(props, S_KEYFRAMES_INTERVAL_SECONDS), is_seconds);
@@ -915,10 +935,90 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 		_context->keyint_min = _context->gop_size;
 	}
 
-	{ // FFmpeg
-		// Apply custom options.
-		av_opt_set_from_string(_context->priv_data, obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS),
-		                       nullptr, "=", ";");
+	{ // FFmpeg Custom Options
+		const char* opts     = obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS);
+		size_t      opts_len = strnlen(opts, 65535);
+
+		// Parses options like FFmpeg's command line would:
+		// '-key=value -key=value -key=value'
+
+		std::stack<char> quote_stack;
+
+		bool have_param = false;
+		bool have_key   = false;
+		bool have_value = false;
+
+		bool value_is_quoted = false;
+
+		size_t p_key   = 0;
+		size_t p_value = 0;
+
+		std::string key;
+		std::string value;
+
+		for (size_t p = 0; p <= opts_len; p++) {
+			char here = opts[p];
+
+			if (!have_param) {
+				if (here == '-') {
+					have_param = true;
+					p_key      = p + 1;
+				}
+			} else if (!have_key) {
+				if (here == '=') {
+					have_key = true;
+					key      = std::string(&opts[p_key], &opts[p]);
+					p_value  = p + 1;
+					while (quote_stack.size() > 0)
+						quote_stack.pop();
+				} else if (p == opts_len) {
+					PLOG_WARNING("Option '%s' has no value, ignoring.", &opts[p_key]);
+				}
+			} else {
+				// To support quotes, some interesting stuff needs to be done.
+				// First we need to parse \ as escaping the next character, and just jump over it.
+				if (here == '\\') {
+					p++;
+				} else {
+					if ((here == '"') || (here == '\'')) {
+						// Dealing with quotes is only possible with a stack.
+						if ((quote_stack.size() > 0) && (quote_stack.top() == here)) {
+							quote_stack.pop();
+						} else {
+							quote_stack.push(here);
+							value_is_quoted = true;
+						}
+					} else if ((here == ' ') || (p == opts_len)) {
+						if (quote_stack.size() == 0) {
+							have_value = true;
+						} else if (p == opts_len) {
+							PLOG_WARNING(
+							    "Option '%.*s' has mismatched quotations, ignoring.",
+							    p_value - p_key, &opts[p_key]);
+						}
+					}
+
+					if (have_value) {
+						if (value_is_quoted) {
+							value = std::string(&opts[p_value + 1], &opts[p - 1]);
+						} else {
+							value = std::string(&opts[p_value], &opts[p]);
+						}
+						int ret = 0;
+						if ((ret = av_opt_set(_context, key.c_str(), value.c_str(),
+						                      AV_OPT_SEARCH_CHILDREN))
+						    < 0) {
+							PLOG_WARNING("Option '%s' could not be set to '%s'.",
+							             key.c_str(), value.c_str());
+						}
+						have_param      = false;
+						have_key        = false;
+						have_value      = false;
+						value_is_quoted = false;
+					}
+				}
+			}
+		}
 	}
 
 	if (_handler)
