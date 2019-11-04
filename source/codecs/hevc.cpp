@@ -197,8 +197,8 @@ void progress_parse(uint8_t*& ptr, uint8_t* end, size_t& sz)
 	sz = get_nal_size(ptr, end);
 }
 
-void obsffmpeg::codecs::hevc::extract_header_sei(uint8_t* data, size_t sz_data,
-                                                 std::vector<uint8_t>& header, std::vector<uint8_t>& sei)
+void obsffmpeg::codecs::hevc::extract_header_sei(uint8_t* data, size_t sz_data, std::vector<uint8_t>& header,
+                                                 std::vector<uint8_t>& sei)
 {
 	uint8_t* ptr = data;
 	uint8_t* end = data + sz_data;

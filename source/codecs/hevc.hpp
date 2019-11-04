@@ -61,8 +61,8 @@ namespace obsffmpeg {
 				UNKNOWN = -1,
 			};
 
-			void extract_header_sei(uint8_t* data, size_t sz_data,
-			                        std::vector<uint8_t>& header, std::vector<uint8_t>& sei);
+			void extract_header_sei(uint8_t* data, size_t sz_data, std::vector<uint8_t>& header,
+			                        std::vector<uint8_t>& sei);
 
 		} // namespace hevc
 	}         // namespace codecs
