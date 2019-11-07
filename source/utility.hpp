@@ -87,4 +87,15 @@ namespace obsffmpeg {
 	{
 		return obs_get_version() < MAKE_SEMANTIC_VERSION(24, 0, 0);
 	}
+
+	struct obs_graphics {
+		obs_graphics()
+		{
+			obs_enter_graphics();
+		}
+		~obs_graphics()
+		{
+			obs_leave_graphics();
+		}
+	};
 } // namespace obsffmpeg
