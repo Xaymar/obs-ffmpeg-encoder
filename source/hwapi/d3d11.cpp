@@ -22,11 +22,14 @@
 #include "d3d11.hpp"
 #include <sstream>
 #include <vector>
+#include "utility.hpp"
 
 extern "C" {
 #pragma warning(push)
 #pragma warning(disable : 4244)
+#include <graphics/graphics.h>
 #include <libavutil/hwcontext_d3d11va.h>
+#include <obs.h>
 #pragma warning(pop)
 }
 
@@ -123,6 +126,22 @@ std::shared_ptr<obsffmpeg::hwapi::instance> obsffmpeg::hwapi::d3d11::create(obsf
 	return std::make_shared<d3d11_instance>(device, context);
 }
 
+std::shared_ptr<obsffmpeg::hwapi::instance> obsffmpeg::hwapi::d3d11::create_from_obs()
+{
+	auto gctx = obsffmpeg::obs_graphics();
+
+	if (GS_DEVICE_DIRECT3D_11 != gs_get_device_type()) {
+		throw std::runtime_error("OBS Device is not a D3D11 Device.");
+	}
+
+	ATL::CComPtr<ID3D11Device> device =
+	    ATL::CComPtr<ID3D11Device>(reinterpret_cast<ID3D11Device*>(gs_get_device_obj()));
+	ATL::CComPtr<ID3D11DeviceContext> context;
+	device->GetImmediateContext(&context);
+
+	return std::make_shared<d3d11_instance>(device, context);
+}
+
 struct D3D11AVFrame {
 	ATL::CComPtr<ID3D11Texture2D> handle;
 };
@@ -150,8 +169,11 @@ AVBufferRef* obsffmpeg::hwapi::d3d11_instance::create_device_context()
 	d3d11va->device->AddRef();
 	d3d11va->device_context = _context;
 	d3d11va->device_context->AddRef();
+	d3d11va->lock   = [](void* lock_ctx) { obs_enter_graphics(); };
+	d3d11va->unlock = [](void* lock_ctx) { obs_leave_graphics(); };
 
-	if (av_hwdevice_ctx_init(dctx_ref) < 0)
+	int ret = av_hwdevice_ctx_init(dctx_ref);
+	if (ret < 0)
 		throw std::runtime_error("Failed to initialize AVHWDeviceContext.");
 
 	return dctx_ref;
@@ -159,6 +181,8 @@ AVBufferRef* obsffmpeg::hwapi::d3d11_instance::create_device_context()
 
 std::shared_ptr<AVFrame> obsffmpeg::hwapi::d3d11_instance::allocate_frame(AVBufferRef* frames)
 {
+	auto gctx = obsffmpeg::obs_graphics();
+
 	auto frame = std::shared_ptr<AVFrame>(av_frame_alloc(), [](AVFrame* frame) {
 		av_frame_unref(frame);
 		av_frame_free(&frame);
@@ -174,6 +198,8 @@ std::shared_ptr<AVFrame> obsffmpeg::hwapi::d3d11_instance::allocate_frame(AVBuff
 void obsffmpeg::hwapi::d3d11_instance::copy_from_obs(AVBufferRef*, uint32_t handle, uint64_t lock_key,
                                                      uint64_t* next_lock_key, std::shared_ptr<AVFrame> frame)
 {
+	auto gctx = obsffmpeg::obs_graphics();
+
 	ATL::CComPtr<IDXGIKeyedMutex> mutex;
 	ATL::CComPtr<ID3D11Texture2D> input;
 
@@ -211,6 +237,8 @@ void obsffmpeg::hwapi::d3d11_instance::copy_from_obs(AVBufferRef*, uint32_t hand
 std::shared_ptr<AVFrame> obsffmpeg::hwapi::d3d11_instance::avframe_from_obs(AVBufferRef* frames, uint32_t handle,
                                                                             uint64_t lock_key, uint64_t* next_lock_key)
 {
+	auto gctx = obsffmpeg::obs_graphics();
+
 	auto frame = this->allocate_frame(frames);
 	this->copy_from_obs(frames, handle, lock_key, next_lock_key, frame);
 	return frame;

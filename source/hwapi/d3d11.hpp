@@ -53,6 +53,8 @@ namespace obsffmpeg {
 
 			virtual std::shared_ptr<obsffmpeg::hwapi::instance>
 			    create(obsffmpeg::hwapi::device target) override;
+
+			virtual std::shared_ptr<obsffmpeg::hwapi::instance> create_from_obs() override;
 		};
 
 		class d3d11_instance : public ::obsffmpeg::hwapi::instance {
