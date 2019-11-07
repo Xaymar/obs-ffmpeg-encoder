@@ -776,14 +776,7 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 #ifdef WIN32
 		_hwapi = std::make_shared<obsffmpeg::hwapi::d3d11>();
 #endif
-		obsffmpeg::hwapi::device dev;
-		if (_handler)
-			dev = _handler->find_hw_device(_hwapi, _codec, _context);
-		try {
-			_hwinst = _hwapi->create(dev);
-		} catch (...) {
-			throw obsffmpeg::unsupported_gpu_exception("Creating GPU context failed.");
-		}
+		_hwinst = _hwapi->create_from_obs();
 	}
 
 	// Initialize context.
@@ -838,6 +831,7 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 	update(settings);
 
 	// Initialize Encoder
+	auto gctx = obsffmpeg::obs_graphics();
 	int res = avcodec_open2(_context, _codec, NULL);
 	if (res < 0) {
 		std::stringstream sstr;
@@ -849,6 +843,7 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 
 obsffmpeg::encoder::~encoder()
 {
+	auto gctx = obsffmpeg::obs_graphics();
 	if (_context) {
 		// Flush encoders that require it.
 		if ((_codec->capabilities & AV_CODEC_CAP_DELAY) != 0) {
@@ -1168,6 +1163,7 @@ bool obsffmpeg::encoder::video_encode_texture(uint32_t handle, int64_t pts, uint
 
 int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_packet* packet)
 {
+	auto gctx = obsffmpeg::obs_graphics();
 	av_packet_unref(&_current_packet);
 
 	int res = avcodec_receive_packet(_context, &_current_packet);
@@ -1232,6 +1228,7 @@ int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_pac
 
 int obsffmpeg::encoder::send_frame(std::shared_ptr<AVFrame> const frame)
 {
+	auto gctx = obsffmpeg::obs_graphics();
 	int res = avcodec_send_frame(_context, frame.get());
 	if (res == 0) {
 		push_used_frame(frame);
