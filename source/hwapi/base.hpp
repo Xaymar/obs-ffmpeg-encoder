@@ -49,6 +49,8 @@ namespace obsffmpeg {
 			virtual std::list<obsffmpeg::hwapi::device> enumerate_adapters() = 0;
 
 			virtual std::shared_ptr<obsffmpeg::hwapi::instance> create(obsffmpeg::hwapi::device target) = 0;
+
+			virtual std::shared_ptr<obsffmpeg::hwapi::instance> create_from_obs() = 0;
 		};
 
 		class instance {
