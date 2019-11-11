@@ -64,6 +64,7 @@ extern "C" {
 #define ST_FFMPEG_THREADS "FFmpeg.Threads"
 #define ST_FFMPEG_COLORFORMAT "FFmpeg.ColorFormat"
 #define ST_FFMPEG_STANDARDCOMPLIANCE "FFmpeg.StandardCompliance"
+#define ST_FFMPEG_GPU "FFmpeg.GPU"
 
 enum class keyframe_type { SECONDS, FRAMES };
 
@@ -483,6 +484,7 @@ void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings, bool hw_enco
 			obs_data_set_default_int(settings, ST_FFMPEG_COLORFORMAT,
 			                         static_cast<int64_t>(AV_PIX_FMT_NONE));
 			obs_data_set_default_int(settings, ST_FFMPEG_THREADS, 0);
+			obs_data_set_default_int(settings, ST_FFMPEG_GPU, 0);
 		}
 		obs_data_set_default_int(settings, ST_FFMPEG_STANDARDCOMPLIANCE, FF_COMPLIANCE_STRICT);
 	}
@@ -555,6 +557,10 @@ void obsffmpeg::encoder_factory::get_properties(obs_properties_t* props, bool hw
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_CUSTOMSETTINGS)));
 		}
 		if (!hw_encode) {
+      {
+        auto p = obs_properties_add_int(grp, ST_FFMPEG_GPU, TRANSLATE(ST_FFMPEG_GPU), 0, std::numeric_limits<uint8_t>::max(), 1);
+        obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_GPU)));
+      }
 			if (avcodec_ptr->pix_fmts) {
 				auto p = obs_properties_add_list(grp, ST_FFMPEG_COLORFORMAT,
 				                                 TRANSLATE(ST_FFMPEG_COLORFORMAT), OBS_COMBO_TYPE_LIST,
@@ -822,6 +828,7 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 		          ffmpeg::tools::get_pixel_format_name(_swscale.get_target_format()),
 		          ffmpeg::tools::get_color_space_name(_swscale.get_target_colorspace()),
 		          _swscale.is_target_full_range() ? "Full" : "Partial");
+		PLOG_INFO("[%s]   GPU Selected: %d", _codec->name, obs_data_get_int(settings, ST_FFMPEG_GPU));
 	}
 	PLOG_INFO("[%s]   Framerate: %ld/%ld (%f FPS)", _codec->name, _context->time_base.den, _context->time_base.num,
 	          static_cast<double_t>(_context->time_base.den) / static_cast<double_t>(_context->time_base.num));
@@ -877,6 +884,8 @@ void obsffmpeg::encoder::get_properties(obs_properties_t* props, bool hw_encode)
 	obs_property_set_enabled(obs_properties_get(props, ST_FFMPEG_COLORFORMAT), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_FFMPEG_THREADS), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_FFMPEG_STANDARDCOMPLIANCE), false);
+	obs_property_set_enabled(obs_properties_get(props, ST_FFMPEG_GPU), false);
+
 }
 
 bool obsffmpeg::encoder::update(obs_data_t* settings)
@@ -929,6 +938,9 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 		}
 		_context->keyint_min = _context->gop_size;
 	}
+
+  if (!_hwinst)
+	  av_opt_set_int(_context, "gpu", (int)obs_data_get_int(settings, ST_FFMPEG_GPU), AV_OPT_SEARCH_CHILDREN);
 
 	{ // FFmpeg Custom Options
 		const char* opts     = obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS);
