@@ -557,10 +557,11 @@ void obsffmpeg::encoder_factory::get_properties(obs_properties_t* props, bool hw
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_CUSTOMSETTINGS)));
 		}
 		if (!hw_encode) {
-      {
-        auto p = obs_properties_add_int(grp, ST_FFMPEG_GPU, TRANSLATE(ST_FFMPEG_GPU), 0, std::numeric_limits<uint8_t>::max(), 1);
-        obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_GPU)));
-      }
+			{
+				auto p = obs_properties_add_int(grp, ST_FFMPEG_GPU, TRANSLATE(ST_FFMPEG_GPU), 0,
+				                                std::numeric_limits<uint8_t>::max(), 1);
+				obs_property_set_long_description(p, TRANSLATE(DESC(ST_FFMPEG_GPU)));
+			}
 			if (avcodec_ptr->pix_fmts) {
 				auto p = obs_properties_add_list(grp, ST_FFMPEG_COLORFORMAT,
 				                                 TRANSLATE(ST_FFMPEG_COLORFORMAT), OBS_COMBO_TYPE_LIST,
@@ -839,7 +840,7 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 
 	// Initialize Encoder
 	auto gctx = obsffmpeg::obs_graphics();
-	int res = avcodec_open2(_context, _codec, NULL);
+	int  res  = avcodec_open2(_context, _codec, NULL);
 	if (res < 0) {
 		std::stringstream sstr;
 		sstr << "Initializing encoder '" << _codec->name
@@ -885,7 +886,6 @@ void obsffmpeg::encoder::get_properties(obs_properties_t* props, bool hw_encode)
 	obs_property_set_enabled(obs_properties_get(props, ST_FFMPEG_THREADS), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_FFMPEG_STANDARDCOMPLIANCE), false);
 	obs_property_set_enabled(obs_properties_get(props, ST_FFMPEG_GPU), false);
-
 }
 
 bool obsffmpeg::encoder::update(obs_data_t* settings)
@@ -939,8 +939,8 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 		_context->keyint_min = _context->gop_size;
 	}
 
-  if (!_hwinst)
-	  av_opt_set_int(_context, "gpu", (int)obs_data_get_int(settings, ST_FFMPEG_GPU), AV_OPT_SEARCH_CHILDREN);
+	if (!_hwinst)
+		av_opt_set_int(_context, "gpu", (int)obs_data_get_int(settings, ST_FFMPEG_GPU), AV_OPT_SEARCH_CHILDREN);
 
 	{ // FFmpeg Custom Options
 		const char* opts     = obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS);
@@ -1011,13 +1011,13 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 						} else {
 							value = std::string(&opts[p_value], &opts[p]);
 						}
-						int ret = 0;
-						if ((ret = av_opt_set(_context, key.c_str(), value.c_str(),
-						                      AV_OPT_SEARCH_CHILDREN))
-						    < 0) {
-							char sterror[AV_ERROR_MAX_STRING_SIZE];
-							av_make_error_string(sterror, AV_ERROR_MAX_STRING_SIZE, ret);
-							PLOG_WARNING("Option '%s' could not be set to '%s'. (%s)", key.c_str(), value.c_str(), sterror);
+						int res = av_opt_set(_context, key.c_str(), value.c_str(),
+						                     AV_OPT_SEARCH_CHILDREN);
+						if (res < 0) {
+							PLOG_WARNING(
+							    "Failed setting option '%s' to '%s' due to error: %s",
+							    key.c_str(), value.c_str(),
+							    ffmpeg::tools::get_error_description(res));
 						}
 						have_param      = false;
 						have_key        = false;
@@ -1176,10 +1176,14 @@ bool obsffmpeg::encoder::video_encode_texture(uint32_t handle, int64_t pts, uint
 
 int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_packet* packet)
 {
-	auto gctx = obsffmpeg::obs_graphics();
+	int res = 0;
+
 	av_packet_unref(&_current_packet);
 
-	int res = avcodec_receive_packet(_context, &_current_packet);
+	{
+		auto gctx = obsffmpeg::obs_graphics();
+		res       = avcodec_receive_packet(_context, &_current_packet);
+	}
 	if (res != 0) {
 		return res;
 	}
@@ -1241,8 +1245,11 @@ int obsffmpeg::encoder::receive_packet(bool* received_packet, struct encoder_pac
 
 int obsffmpeg::encoder::send_frame(std::shared_ptr<AVFrame> const frame)
 {
-	auto gctx = obsffmpeg::obs_graphics();
-	int res = avcodec_send_frame(_context, frame.get());
+	int res = 0;
+	{
+		auto gctx = obsffmpeg::obs_graphics();
+		res       = avcodec_send_frame(_context, frame.get());
+	}
 	if (res == 0) {
 		push_used_frame(frame);
 	}
