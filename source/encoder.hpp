@@ -151,5 +151,12 @@ namespace obsffmpeg {
 
 		bool encode_avframe(std::shared_ptr<AVFrame> frame, struct encoder_packet* packet,
 		                    bool* received_packet);
+
+		public: // Handler API
+		bool is_hardware_encode();
+
+		const AVCodec* get_avcodec();
+
+		const AVCodecContext* get_avcodeccontext();
 	};
 } // namespace obsffmpeg

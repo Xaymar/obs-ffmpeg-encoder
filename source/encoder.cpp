@@ -772,16 +772,20 @@ std::shared_ptr<AVFrame> obsffmpeg::encoder::pop_used_frame()
 }
 
 obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool is_texture_encode)
-    : _self(encoder), _lag_in_frames(0), _count_send_frames(0), _have_first_frame(false)
+    : _self(encoder), _factory(reinterpret_cast<encoder_factory*>(obs_encoder_get_type_data(_self))),
+      _codec(_factory->get_avcodec()), _context(nullptr), _lag_in_frames(0), _count_send_frames(0),
+      _have_first_frame(false)
 {
-	// Initial set up.
-	_factory = reinterpret_cast<encoder_factory*>(obs_encoder_get_type_data(_self));
-	_codec   = _factory->get_avcodec();
+	// Find a handler
 	_handler = obsffmpeg::find_codec_handler(_codec->name);
 
+	// Initialize GPU Stuff
 	if (is_texture_encode) {
 #ifdef WIN32
-		_hwapi = std::make_shared<obsffmpeg::hwapi::d3d11>();
+		auto gctx = obsffmpeg::obs_graphics();
+		if (gs_get_device_type() == GS_DEVICE_DIRECT3D_11) {
+			_hwapi = std::make_shared<obsffmpeg::hwapi::d3d11>();
+		}
 #endif
 		_hwinst = _hwapi->create_from_obs();
 	}
@@ -797,14 +801,10 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 	av_init_packet(&_current_packet);
 	av_new_packet(&_current_packet, 8 * 1024 * 1024); // 8 MB precached Packet size.
 
-	if (!is_texture_encode) {
-		initialize_sw(settings);
+	if (is_texture_encode) {
+		initialize_hw(settings);
 	} else {
-		try {
-			initialize_hw(settings);
-		} catch (...) {
-			throw obsffmpeg::unsupported_gpu_exception("Initializing hardware context failed.");
-		}
+		initialize_sw(settings);
 	}
 
 	// Log Encoder info
@@ -1342,4 +1342,19 @@ bool obsffmpeg::encoder::encode_avframe(std::shared_ptr<AVFrame> frame, encoder_
 		push_free_frame(frame);
 
 	return true;
+}
+
+bool obsffmpeg::encoder::is_hardware_encode()
+{
+	return _hwinst != nullptr;
+}
+
+const AVCodec* obsffmpeg::encoder::get_avcodec()
+{
+	return _codec;
+}
+
+const AVCodecContext* obsffmpeg::encoder::get_avcodeccontext()
+{
+	return _context;
 }
