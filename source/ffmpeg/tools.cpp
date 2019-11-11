@@ -113,52 +113,11 @@ const char* ffmpeg::tools::get_color_space_name(AVColorSpace v)
 
 const char* ffmpeg::tools::get_error_description(int error)
 {
-	switch (error) {
-	case AVERROR(EPERM):
-		return "Permission Denied";
-		//	case AVERROR(ENOENT):
-		//	case AVERROR(ESRCH):
-		//	case AVERROR(EINTR):
-		//	case AVERROR(EIO):
-		//	case AVERROR(ENXIO):
-		//	case AVERROR(E2BIG):
-		//	case AVERROR(ENOEXEC):
-		//	case AVERROR(EBADF):
-		//	case AVERROR(ECHILD):
-		//	case AVERROR(EAGAIN):
-	case AVERROR(ENOMEM):
-		return "Out Of Memory";
-		//	case AVERROR(EACCES):
-		//	case AVERROR(EFAULT):
-		//	case AVERROR(EBUSY):
-		//	case AVERROR(EEXIST):
-		//	case AVERROR(EXDEV):
-		//	case AVERROR(ENODEV):
-		//	case AVERROR(ENOTDIR):
-		//	case AVERROR(EISDIR):
-		//	case AVERROR(ENFILE):
-		//	case AVERROR(EMFILE):
-		//	case AVERROR(ENOTTY):
-		//	case AVERROR(EFBIG):
-		//	case AVERROR(ENOSPC):
-		//	case AVERROR(ESPIPE):
-		//	case AVERROR(EROFS):
-		//	case AVERROR(EMLINK):
-		//	case AVERROR(EPIPE):
-		//	case AVERROR(EDOM):
-		//	case AVERROR(EDEADLK):
-		//	case AVERROR(ENAMETOOLONG):
-		//	case AVERROR(ENOLCK):
-		//	case AVERROR(ENOSYS):
-		//	case AVERROR(ENOTEMPTY):
-	case AVERROR(EINVAL):
-		return "Invalid Value(s)";
-	case AVERROR(ERANGE):
-		return "Out of Range";
-		//	case AVERROR(EILSEQ):
-		//	case AVERROR(STRUNCATE):
+	thread_local char error_buf[AV_ERROR_MAX_STRING_SIZE + 1];
+	if (av_strerror(error, error_buf, AV_ERROR_MAX_STRING_SIZE) < 0) {
+		snprintf(error_buf, AV_ERROR_MAX_STRING_SIZE, "Unknown Error (%i)", error);
 	}
-	return "Not Translated Yet";
+	return error_buf;
 }
 
 static std::map<video_format, AVPixelFormat> obs_to_av_format_map = {
