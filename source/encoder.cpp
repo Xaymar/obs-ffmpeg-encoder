@@ -1314,9 +1314,6 @@ void obsffmpeg::encoder::parse_ffmpeg_commandline(std::string text)
 				} else if (here2 == 'b') {
 					opt_stream << '\b';
 					p++;
-				} else if (here2 == 'e') {
-					opt_stream << '\e';
-					p++;
 				} else if (here2 == 'f') {
 					opt_stream << '\f';
 					p++;
@@ -1391,13 +1388,17 @@ void obsffmpeg::encoder::parse_ffmpeg_commandline(std::string text)
 			continue;
 		}
 
-		std::string key{&opt.at(1), opt.at(eq_at - cstr)};
-		std::string value{&opt.at(eq_at - cstr + 1), &opt.at(opt.size())};
+		try {
+			std::string key   = opt.substr(1, eq_at - cstr);
+			std::string value = opt.substr(eq_at - cstr + 1);
 
-		int res = av_opt_set(_context, key.c_str(), value.c_str(), AV_OPT_SEARCH_CHILDREN);
-		if (res < 0) {
-			PLOG_WARNING("Option '%s' could not be set to '%s' due to error: %s", key.c_str(),
-			             value.c_str(), ffmpeg::tools::get_error_description(res));
+			int res = av_opt_set(_context, key.c_str(), value.c_str(), AV_OPT_SEARCH_CHILDREN);
+			if (res < 0) {
+				PLOG_WARNING("Option '%s' encountered error: %s", opt.c_str(),
+				             ffmpeg::tools::get_error_description(res));
+			}
+		} catch (const std::exception& ex) {
+			PLOG_ERROR("Option '%s' encountered exception: %s", opt.c_str(), ex.what())
 		}
 	}
 }
