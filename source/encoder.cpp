@@ -358,7 +358,7 @@ obsffmpeg::encoder_factory::encoder_factory(const AVCodec* codec) : avcodec_ptr(
 
 		// Allow UI Handler to replace visible name.
 		if (_handler)
-			_handler->override_visible_name(avcodec_ptr, info.readable_name);
+			_handler->get_name(avcodec_ptr, info.readable_name);
 	}
 
 	// Assign Ids.
@@ -453,17 +453,22 @@ void obsffmpeg::encoder_factory::register_encoder()
 		info_fallback.oei.encode          = _encode;
 		info_fallback.oei.type_data       = this;
 
-		obs_register_encoder(&info_fallback.oei);
-		PLOG_DEBUG("Registered software fallback for encoder #%llX", avcodec_ptr);
 	} else {
 		// Is not a GPU Encoder, don't implement fallback.
 		info.oei.create = _create;
 		info.oei.encode = _encode;
 	}
 
+	if (_handler)
+		_handler->adjust_encoder_info(this, &info, &info_fallback);
+
 	obs_register_encoder(&info.oei);
 	PLOG_DEBUG("Registered encoder #%llX with name '%s' and long name '%s' and caps %llX", avcodec_ptr,
 	           avcodec_ptr->name, avcodec_ptr->long_name, avcodec_ptr->capabilities);
+	if (info_fallback.uid.size() > 0) {
+		obs_register_encoder(&info_fallback.oei);
+		PLOG_DEBUG("Registered software fallback for encoder #%llX", avcodec_ptr);
+	}
 }
 
 void obsffmpeg::encoder_factory::get_defaults(obs_data_t* settings, bool hw_encode)

@@ -22,6 +22,7 @@
 #pragma once
 
 #include <string>
+#include "encoder.hpp"
 #include "hwapi/base.hpp"
 
 extern "C" {
@@ -39,10 +40,14 @@ extern "C" {
 namespace obsffmpeg {
 	namespace ui {
 		class handler {
-			public:
-			virtual void override_visible_name(const AVCodec* codec, std::string& name);
+			public /*factory*/:
+			virtual void adjust_encoder_info(obsffmpeg::encoder_factory* factory,
+			                                 obsffmpeg::encoder_info*    main,
+			                                 obsffmpeg::encoder_info*    fallback) = 0;
 
-			virtual void override_info(obs_encoder_info* main, obs_encoder_info* fallback);
+			public /*instance*/:
+
+			virtual void get_name(const AVCodec* codec, std::string& name);
 
 			virtual void override_colorformat(AVPixelFormat& target_format, obs_data_t* settings,
 			                                  const AVCodec* codec, AVCodecContext* context);

@@ -80,7 +80,7 @@ INITIALIZER(nvenc_h264_handler_init)
 	});
 };
 
-void obsffmpeg::ui::nvenc_h264_handler::override_visible_name(const AVCodec*, std::string& name)
+void obsffmpeg::ui::nvenc_h264_handler::get_name(const AVCodec*, std::string& name)
 {
 	name = "H.264/AVC Encoder (NVidia NVENC)";
 }
