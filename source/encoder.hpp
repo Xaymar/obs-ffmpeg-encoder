@@ -158,5 +158,7 @@ namespace obsffmpeg {
 		const AVCodec* get_avcodec();
 
 		const AVCodecContext* get_avcodeccontext();
+
+		void parse_ffmpeg_commandline(std::string text);
 	};
 } // namespace obsffmpeg

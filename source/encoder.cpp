@@ -946,87 +946,7 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 		const char* opts     = obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS);
 		size_t      opts_len = strnlen(opts, 65535);
 
-		// Parses options like FFmpeg's command line would:
-		// '-key=value -key=value -key=value'
-
-		std::stack<char> quote_stack;
-
-		bool have_param = false;
-		bool have_key   = false;
-		bool have_value = false;
-
-		bool value_is_quoted = false;
-
-		size_t p_key   = 0;
-		size_t p_value = 0;
-
-		std::string key;
-		std::string value;
-
-		for (size_t p = 0; p <= opts_len; p++) {
-			char here = opts[p];
-
-			if (!have_param) {
-				if (here == '-') {
-					have_param = true;
-					p_key      = p + 1;
-				}
-			} else if (!have_key) {
-				if (here == '=') {
-					have_key = true;
-					key      = std::string(&opts[p_key], &opts[p]);
-					p_value  = p + 1;
-					while (quote_stack.size() > 0)
-						quote_stack.pop();
-				} else if (p == opts_len) {
-					PLOG_WARNING("Option '%s' has no value, ignoring.", &opts[p_key]);
-				}
-			} else {
-				// To support quotes, some interesting stuff needs to be done.
-				// First we need to parse \ as escaping the next character, and just jump over it.
-				if (here == '\\') {
-					p++;
-				} else {
-					if ((here == '"') || (here == '\'')) {
-						// Dealing with quotes is only possible with a stack.
-						if ((quote_stack.size() > 0) && (quote_stack.top() == here)) {
-							quote_stack.pop();
-						} else {
-							quote_stack.push(here);
-							value_is_quoted = true;
-						}
-					} else if ((here == ' ') || (p == opts_len)) {
-						if (quote_stack.size() == 0) {
-							have_value = true;
-						} else if (p == opts_len) {
-							PLOG_WARNING(
-							    "Option '%.*s' has mismatched quotations, ignoring.",
-							    p_value - p_key, &opts[p_key]);
-						}
-					}
-
-					if (have_value) {
-						if (value_is_quoted) {
-							value = std::string(&opts[p_value + 1], &opts[p - 1]);
-						} else {
-							value = std::string(&opts[p_value], &opts[p]);
-						}
-						int res = av_opt_set(_context, key.c_str(), value.c_str(),
-						                     AV_OPT_SEARCH_CHILDREN);
-						if (res < 0) {
-							PLOG_WARNING(
-							    "Failed setting option '%s' to '%s' due to error: %s",
-							    key.c_str(), value.c_str(),
-							    ffmpeg::tools::get_error_description(res));
-						}
-						have_param      = false;
-						have_key        = false;
-						have_value      = false;
-						value_is_quoted = false;
-					}
-				}
-			}
-		}
+		parse_ffmpeg_commandline(std::string{opts, opts + opts_len});
 	}
 
 	if (_handler)
@@ -1357,4 +1277,127 @@ const AVCodec* obsffmpeg::encoder::get_avcodec()
 const AVCodecContext* obsffmpeg::encoder::get_avcodeccontext()
 {
 	return _context;
+}
+
+void obsffmpeg::encoder::parse_ffmpeg_commandline(std::string text)
+{
+	// Steps to properly parse a command line:
+	// 1. Split by space and package by quotes.
+	// 2. Parse each resulting option individually.
+
+	// First, we split by space and of course respect quotes while doing so.
+	// That means that "-foo= bar" is stored as std::string("-foo= bar"),
+	//  and things like -foo="bar" is stored as std::string("-foo=\"bar\"").
+	// However "-foo"=bar" -foo2=bar" is stored as std::string("-foo=bar -foo2=bar")
+	//  because the quote was not escaped.
+	std::list<std::string> opts;
+	std::stringstream      opt_stream{std::ios_base::in | std::ios_base::out | std::ios_base::binary};
+	std::stack<char>       quote_stack;
+	for (size_t p = 0; p <= text.size(); p++) {
+		char here = p < text.size() ? text.at(p) : 0;
+
+		if (here == '\\') {
+			size_t p2 = p + 1;
+			if (p2 < text.size()) {
+				char here2 = text.at(p2);
+				if (isdigit(here2)) { // Octal
+					// Not supported yet.
+					p++;
+				} else if (here2 == 'x') { // Hexadecimal
+					// Not supported yet.
+					p += 3;
+				} else if (here2 == 'u') { // 4 or 8 wide Unicode.
+					                   // Not supported yet.
+				} else if (here2 == 'a') {
+					opt_stream << '\a';
+					p++;
+				} else if (here2 == 'b') {
+					opt_stream << '\b';
+					p++;
+				} else if (here2 == 'e') {
+					opt_stream << '\e';
+					p++;
+				} else if (here2 == 'f') {
+					opt_stream << '\f';
+					p++;
+				} else if (here2 == 'n') {
+					opt_stream << '\n';
+					p++;
+				} else if (here2 == 'r') {
+					opt_stream << '\r';
+					p++;
+				} else if (here2 == 't') {
+					opt_stream << '\t';
+					p++;
+				} else if (here2 == 'v') {
+					opt_stream << '\v';
+					p++;
+				} else if (here2 == '\\') {
+					opt_stream << '\\';
+					p++;
+				} else if (here2 == '\'') {
+					opt_stream << '\'';
+					p++;
+				} else if (here2 == '"') {
+					opt_stream << '"';
+					p++;
+				} else if (here2 == '?') {
+					opt_stream << '\?';
+					p++;
+				}
+			}
+		} else if ((here == '\'') || (here == '"')) {
+			if (quote_stack.size() > 1) {
+				opt_stream << here;
+			}
+			if (quote_stack.size() == 0) {
+				quote_stack.push(here);
+			} else if (quote_stack.top() == here) {
+				quote_stack.pop();
+			} else {
+				quote_stack.push(here);
+			}
+		} else if ((here == 0) || ((here == ' ') && (quote_stack.size() == 0))) {
+			std::string ropt = opt_stream.str();
+			if (ropt.size() > 0) {
+				opts.push_back(ropt);
+				opt_stream.clear();
+			}
+		} else {
+			opt_stream << here;
+		}
+	}
+
+	// Now that we have a list of parameters as neatly grouped strings, and
+	//  have also dealt with escaping for the most part. We want to parse
+	//  an FFmpeg commandline option set here, so the first character in
+	//  the string must be a '-'.
+	for (std::string& opt : opts) {
+		// Skip empty options.
+		if (opt.size() == 0)
+			continue;
+
+		// Skip options that don't start with a '-'.
+		if (opt.at(0) != '-') {
+			PLOG_WARNING("Option '%s' is malformed, must start with a '-'.", opt.c_str());
+			continue;
+		}
+
+		// Skip options that don't contain a '='.
+		const char* cstr  = opt.c_str();
+		const char* eq_at = strchr(cstr, '=');
+		if (eq_at == nullptr) {
+			PLOG_WARNING("Option '%s' is malformed, must contain a '='.", opt.c_str());
+			continue;
+		}
+
+		std::string key{&opt.at(1), opt.at(eq_at - cstr)};
+		std::string value{&opt.at(eq_at - cstr + 1), &opt.at(opt.size())};
+
+		int res = av_opt_set(_context, key.c_str(), value.c_str(), AV_OPT_SEARCH_CHILDREN);
+		if (res < 0) {
+			PLOG_WARNING("Option '%s' could not be set to '%s' due to error: %s", key.c_str(),
+			             value.c_str(), ffmpeg::tools::get_error_description(res));
+		}
+	}
 }
