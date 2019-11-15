@@ -18,3 +18,16 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
+#include "utility.hpp"
+#include "strings.hpp"
+#include "plugin.hpp"
+
+obs_property_t* obsffmpeg::obs_properties_add_tristate(obs_properties_t* props, const char* name, const char* desc)
+{
+	obs_property_t* p = obs_properties_add_list(props, name, desc, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(p, TRANSLATE(S_STATE_DEFAULT), -1);
+	obs_property_list_add_int(p, TRANSLATE(S_STATE_DISABLED), 0);
+	obs_property_list_add_int(p, TRANSLATE(S_STATE_ENABLED), 1);
+	return p;
+}

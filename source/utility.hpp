@@ -98,4 +98,6 @@ namespace obsffmpeg {
 			obs_leave_graphics();
 		}
 	};
+
+	obs_property_t* obs_properties_add_tristate(obs_properties_t* props, const char* name, const char* desc);
 } // namespace obsffmpeg
