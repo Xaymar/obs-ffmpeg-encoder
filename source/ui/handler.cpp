@@ -20,34 +20,27 @@
 // SOFTWARE.
 
 #include "handler.hpp"
+#include "encoder.hpp"
 
-void obsffmpeg::ui::handler::get_name(const AVCodec*, std::string&) {}
-
-void obsffmpeg::ui::handler::override_info(obs_encoder_info*, obs_encoder_info*) {}
-
-void obsffmpeg::ui::handler::override_colorformat(AVPixelFormat&, obs_data_t*, const AVCodec*, AVCodecContext*) {}
-
-void obsffmpeg::ui::handler::override_lag_in_frames(size_t&, obs_data_t*, const AVCodec*, AVCodecContext*) {}
+void obsffmpeg::ui::handler::adjust_encoder_info(obsffmpeg::encoder_factory*, obsffmpeg::encoder_info*,
+                                                 obsffmpeg::encoder_info*)
+{}
 
 void obsffmpeg::ui::handler::get_defaults(obs_data_t*, const AVCodec*, AVCodecContext*, bool) {}
 
-void obsffmpeg::ui::handler::get_properties(obs_properties_t*, const AVCodec*, AVCodecContext*, bool) {}
-
-obsffmpeg::hwapi::device obsffmpeg::ui::handler::find_hw_device(std::shared_ptr<obsffmpeg::hwapi::base>, const AVCodec*,
-                                                                AVCodecContext*)
+bool obsffmpeg::ui::handler::has_keyframe_support(obsffmpeg::encoder* instance)
 {
-	return obsffmpeg::hwapi::device();
+	return (instance->get_avcodec()->capabilities & AV_CODEC_CAP_INTRA_ONLY) == 0;
 }
+
+void obsffmpeg::ui::handler::get_properties(obs_properties_t*, const AVCodec*, AVCodecContext*, bool) {}
 
 void obsffmpeg::ui::handler::update(obs_data_t*, const AVCodec*, AVCodecContext*) {}
 
+void obsffmpeg::ui::handler::override_update(obsffmpeg::encoder*, obs_data_t*) {}
+
 void obsffmpeg::ui::handler::log_options(obs_data_t*, const AVCodec*, AVCodecContext*) {}
 
-void obsffmpeg::ui::handler::import_from_ffmpeg(const std::string, obs_data_t*, const AVCodec*, AVCodecContext*) {}
-
-std::string obsffmpeg::ui::handler::export_for_ffmpeg(obs_data_t*, const AVCodec*, AVCodecContext*)
-{
-	return std::string();
-}
+void obsffmpeg::ui::handler::override_colorformat(AVPixelFormat&, obs_data_t*, const AVCodec*, AVCodecContext*) {}
 
 void obsffmpeg::ui::handler::process_avpacket(AVPacket&, const AVCodec*, AVCodecContext*) {}

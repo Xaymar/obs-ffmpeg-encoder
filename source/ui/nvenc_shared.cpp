@@ -22,6 +22,7 @@
 #include "nvenc_shared.hpp"
 #include <algorithm>
 #include "codecs/hevc.hpp"
+#include "encoder.hpp"
 #include "plugin.hpp"
 #include "strings.hpp"
 #include "utility.hpp"
@@ -132,17 +133,34 @@ std::map<b_ref_mode, std::string> obsffmpeg::nvenc::b_ref_mode_to_opt{
     {b_ref_mode::MIDDLE, "middle"},
 };
 
-void obsffmpeg::nvenc::override_lag_in_frames(size_t& lag, obs_data_t*, const AVCodec*, AVCodecContext* context)
+void obsffmpeg::nvenc::override_update(obsffmpeg::encoder* instance, obs_data_t*)
 {
-	// With NVENC, the number of frames lagged before we get our first
-	// packet is determined by the number of b-frames. Threads, lookahead
-	// frames and various other settings are ignored.
-	// The minimum number of lagged frames is 1.
+	AVCodecContext* context = const_cast<AVCodecContext*>(instance->get_avcodeccontext());
 
-	int64_t rcla = 0;
-	av_opt_get_int(context, "rc-lookahead", AV_OPT_SEARCH_CHILDREN, &rcla);
+	int64_t rclookahead = 0;
+	int64_t surfaces = 0;
+	int64_t async_depth = 0;
 
-	lag = static_cast<size_t>(std::max(1ll + static_cast<int64_t>(context->max_b_frames), rcla));
+	av_opt_get_int(context, "rc-lookahead", AV_OPT_SEARCH_CHILDREN, &rclookahead);
+	av_opt_get_int(context, "surfaces", AV_OPT_SEARCH_CHILDREN, &surfaces);
+	av_opt_get_int(context, "async_depth", AV_OPT_SEARCH_CHILDREN, &async_depth);
+
+	// Calculate and set the number of surfaces to allocate (if not user overridden).
+	if (surfaces == 0) {
+		surfaces = std::max(4ll, (context->max_b_frames + 1ll) * 4ll);
+		if (rclookahead > 0) {
+			surfaces = std::max(1ll, std::max(surfaces, rclookahead + (context->max_b_frames + 5ll)));
+		} else if (context->max_b_frames > 0) {
+			surfaces = std::max(4ll, (context->max_b_frames + 1ll) * 4ll);
+		} else {
+			surfaces = 4;
+		}
+
+		av_opt_set_int(context, "surfaces", surfaces, AV_OPT_SEARCH_CHILDREN);
+	}
+
+	// Set delay
+	context->delay = static_cast<int>(std::min(std::max(async_depth, 3ll), surfaces - 1));
 }
 
 void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, const AVCodec*, AVCodecContext*)

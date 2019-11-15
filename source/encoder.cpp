@@ -355,10 +355,6 @@ obsffmpeg::encoder_factory::encoder_factory(const AVCodec* codec) : avcodec_ptr(
 			sstr << " (" << avcodec_ptr->name << ")";
 		}
 		info.readable_name = sstr.str();
-
-		// Allow UI Handler to replace visible name.
-		if (_handler)
-			_handler->get_name(avcodec_ptr, info.readable_name);
 	}
 
 	// Assign Ids.
@@ -812,34 +808,6 @@ obsffmpeg::encoder::encoder(obs_data_t* settings, obs_encoder_t* encoder, bool i
 		initialize_sw(settings);
 	}
 
-	// Log Encoder info
-	PLOG_INFO("[%s] Initializing...", _codec->name);
-	if (_hwinst) {
-		PLOG_INFO("[%s]   Video Input: %ldx%ld %s %s %s", _codec->name, _context->width, _context->height,
-		          ffmpeg::tools::get_pixel_format_name(_context->sw_pix_fmt),
-		          ffmpeg::tools::get_color_space_name(_context->colorspace),
-		          _swscale.is_source_full_range() ? "Full" : "Partial");
-		PLOG_INFO("[%s]   Video Output: %ldx%ld %s %s %s", _codec->name, _context->width, _context->height,
-		          ffmpeg::tools::get_pixel_format_name(_context->sw_pix_fmt),
-		          ffmpeg::tools::get_color_space_name(_context->colorspace),
-		          _swscale.is_target_full_range() ? "Full" : "Partial");
-	} else {
-		PLOG_INFO("[%s]   Video Input: %ldx%ld %s %s %s", _codec->name, _swscale.get_source_width(),
-		          _swscale.get_source_height(),
-		          ffmpeg::tools::get_pixel_format_name(_swscale.get_source_format()),
-		          ffmpeg::tools::get_color_space_name(_swscale.get_source_colorspace()),
-		          _swscale.is_source_full_range() ? "Full" : "Partial");
-		PLOG_INFO("[%s]   Video Output: %ldx%ld %s %s %s", _codec->name, _swscale.get_target_width(),
-		          _swscale.get_target_height(),
-		          ffmpeg::tools::get_pixel_format_name(_swscale.get_target_format()),
-		          ffmpeg::tools::get_color_space_name(_swscale.get_target_colorspace()),
-		          _swscale.is_target_full_range() ? "Full" : "Partial");
-		PLOG_INFO("[%s]   GPU Selected: %d", _codec->name, obs_data_get_int(settings, ST_FFMPEG_GPU));
-	}
-	PLOG_INFO("[%s]   Framerate: %ld/%ld (%f FPS)", _codec->name, _context->time_base.den, _context->time_base.num,
-	          static_cast<double_t>(_context->time_base.den) / static_cast<double_t>(_context->time_base.num));
-	PLOG_INFO("[%s]   Custom Settings: %s", _codec->name, obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS));
-
 	// Update settings
 	update(settings);
 
@@ -895,41 +863,47 @@ void obsffmpeg::encoder::get_properties(obs_properties_t* props, bool hw_encode)
 
 bool obsffmpeg::encoder::update(obs_data_t* settings)
 {
-	// Settings
-	/// Rate Control
-	_context->strict_std_compliance = static_cast<int>(obs_data_get_int(settings, ST_FFMPEG_STANDARDCOMPLIANCE));
+	// FFmpeg Options
 	_context->debug                 = 0;
+	_context->strict_std_compliance = static_cast<int>(obs_data_get_int(settings, ST_FFMPEG_STANDARDCOMPLIANCE));
+
 	/// Threading
-	if (_codec->capabilities & (AV_CODEC_CAP_AUTO_THREADS | AV_CODEC_CAP_FRAME_THREADS | AV_CODEC_CAP_SLICE_THREADS)
-	    && !_hwinst) {
+	if (!_hwinst) {
+		_context->thread_type = 0;
 		if (_codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
 			_context->thread_type |= FF_THREAD_FRAME;
 		}
 		if (_codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
 			_context->thread_type |= FF_THREAD_SLICE;
 		}
-		int64_t threads = obs_data_get_int(settings, ST_FFMPEG_THREADS);
-		if (threads > 0) {
-			_context->thread_count = static_cast<int>(threads);
-			_lag_in_frames         = _context->thread_count;
+		if (_context->thread_type != 0) {
+			int64_t threads = obs_data_get_int(settings, ST_FFMPEG_THREADS);
+			if (threads > 0) {
+				_context->thread_count = static_cast<int>(threads);
+			} else {
+				_context->thread_count = std::thread::hardware_concurrency();
+			}
 		} else {
-			_context->thread_count = std::thread::hardware_concurrency();
-			_lag_in_frames         = _context->thread_count;
+			_context->thread_count = 1;
 		}
+		// Frame Delay (Lag In Frames)
+		_context->delay = _context->thread_count;
 	} else {
-		_context->thread_count = 1;
-		_context->thread_type  = 0;
-		_lag_in_frames         = 1;
+		_context->delay = 0;
 	}
 
-	if (_handler)
-		_handler->update(settings, _codec, _context);
+	// Apply GPU Selection
+	if (!_hwinst && ffmpeg::tools::can_hardware_encode(_codec)) {
+		av_opt_set_int(_context, "gpu", (int)obs_data_get_int(settings, ST_FFMPEG_GPU), AV_OPT_SEARCH_CHILDREN);
+	}
 
-	if ((_codec->capabilities & AV_CODEC_CAP_INTRA_ONLY) == 0) {
+	// Keyframes
+	if (_handler && _handler->has_keyframe_support(this)) {
 		// Key-Frame Options
 		obs_video_info ovi;
 		if (!obs_get_video_info(&ovi)) {
-			throw std::runtime_error("no video info");
+			throw std::runtime_error(
+			    "obs_get_video_info failed, restart OBS Studio to fix it (hopefully).");
 		}
 
 		int64_t kf_type    = obs_data_get_int(settings, S_KEYFRAMES_INTERVALTYPE);
@@ -944,8 +918,9 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 		_context->keyint_min = _context->gop_size;
 	}
 
-	if (!_hwinst)
-		av_opt_set_int(_context, "gpu", (int)obs_data_get_int(settings, ST_FFMPEG_GPU), AV_OPT_SEARCH_CHILDREN);
+	// Handler Options
+	if (_handler)
+		_handler->update(settings, _codec, _context);
 
 	{ // FFmpeg Custom Options
 		const char* opts     = obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS);
@@ -954,12 +929,56 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 		parse_ffmpeg_commandline(std::string{opts, opts + opts_len});
 	}
 
+	// Handler Overrides
 	if (_handler)
-		_handler->override_lag_in_frames(_lag_in_frames, settings, _codec, _context);
+		_handler->override_update(this, settings);
 
 	// Handler Logging
-	if (_handler)
+	if (_handler) {
+		PLOG_INFO("[%s] Initializing...", _codec->name);
+		PLOG_INFO("[%s]   FFmpeg:", _codec->name);
+		PLOG_INFO("[%s]     Custom Settings: %s", _codec->name,
+		          obs_data_get_string(settings, ST_FFMPEG_CUSTOMSETTINGS));
+		PLOG_INFO("[%s]     Standard Compliance: %s", _codec->name,
+		          ffmpeg::tools::get_std_compliance_name(_context->strict_std_compliance));
+		PLOG_INFO("[%s]     Threading: %s (with %i threads)", _codec->name,
+		          ffmpeg::tools::get_thread_type_name(_context->thread_type), _context->thread_count);
+
+		PLOG_INFO("[%s]   Video:", _codec->name);
+		if (_hwinst) {
+			PLOG_INFO("[%s]     Texture: %ldx%ld %s %s %s", _codec->name, _context->width, _context->height,
+			          ffmpeg::tools::get_pixel_format_name(_context->sw_pix_fmt),
+			          ffmpeg::tools::get_color_space_name(_context->colorspace),
+			          av_color_range_name(_context->color_range));
+		} else {
+			PLOG_INFO("[%s]     Input: %ldx%ld %s %s %s", _codec->name, _swscale.get_source_width(),
+			          _swscale.get_source_height(),
+			          ffmpeg::tools::get_pixel_format_name(_swscale.get_source_format()),
+			          ffmpeg::tools::get_color_space_name(_swscale.get_source_colorspace()),
+			          _swscale.is_source_full_range() ? "Full" : "Partial");
+			PLOG_INFO("[%s]     Output: %ldx%ld %s %s %s", _codec->name, _swscale.get_target_width(),
+			          _swscale.get_target_height(),
+			          ffmpeg::tools::get_pixel_format_name(_swscale.get_target_format()),
+			          ffmpeg::tools::get_color_space_name(_swscale.get_target_colorspace()),
+			          _swscale.is_target_full_range() ? "Full" : "Partial");
+			if (!_hwinst)
+				PLOG_INFO("[%s]     On GPU Index: %lli", _codec->name,
+				          obs_data_get_int(settings, ST_FFMPEG_GPU));
+		}
+		PLOG_INFO("[%s]     Framerate: %ld/%ld (%f FPS)", _codec->name, _context->time_base.den,
+		          _context->time_base.num,
+		          static_cast<double_t>(_context->time_base.den)
+		              / static_cast<double_t>(_context->time_base.num));
+
+		PLOG_INFO("[%s]   Keyframes: ", _codec->name);
+		if (_context->keyint_min != _context->gop_size) {
+			PLOG_INFO("[%s]     Minimum: %i frames", _context->keyint_min);
+			PLOG_INFO("[%s]     Maximum: %i frames", _context->gop_size);
+		} else {
+			PLOG_INFO("[%s]     Distance: %i frames", _context->gop_size);
+		}
 		_handler->log_options(settings, _codec, _context);
+	}
 
 	return true;
 }

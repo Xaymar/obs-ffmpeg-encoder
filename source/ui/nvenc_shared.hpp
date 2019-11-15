@@ -32,6 +32,8 @@ extern "C" {
 }
 
 namespace obsffmpeg {
+	class encoder;
+
 	namespace nvenc {
 		enum class preset : int64_t {
 			DEFAULT,
@@ -75,8 +77,7 @@ namespace obsffmpeg {
 
 		extern std::map<b_ref_mode, std::string> b_ref_mode_to_opt;
 
-		void override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
-		                            AVCodecContext* context);
+		void override_update(obsffmpeg::encoder* instance, obs_data_t* settings);
 
 		void get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 

@@ -22,7 +22,6 @@
 #pragma once
 
 #include <string>
-#include "encoder.hpp"
 #include "hwapi/base.hpp"
 
 extern "C" {
@@ -38,41 +37,36 @@ extern "C" {
 }
 
 namespace obsffmpeg {
+	struct encoder_info;
+	class encoder_factory;
+	class encoder;
+
 	namespace ui {
 		class handler {
 			public /*factory*/:
 			virtual void adjust_encoder_info(obsffmpeg::encoder_factory* factory,
 			                                 obsffmpeg::encoder_info*    main,
-			                                 obsffmpeg::encoder_info*    fallback) = 0;
-
-			public /*instance*/:
-
-			virtual void get_name(const AVCodec* codec, std::string& name);
-
-			virtual void override_colorformat(AVPixelFormat& target_format, obs_data_t* settings,
-			                                  const AVCodec* codec, AVCodecContext* context);
-
-			virtual void override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
-			                                    AVCodecContext* context);
+			                                 obsffmpeg::encoder_info*    fallback);
 
 			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context,
 			                          bool hw_encode);
 
+			public /*settings*/:
+			virtual bool has_keyframe_support(obsffmpeg::encoder* instance);
+
 			virtual void get_properties(obs_properties_t* props, const AVCodec* codec,
 			                            AVCodecContext* context, bool hw_encode);
 
-			virtual obsffmpeg::hwapi::device find_hw_device(std::shared_ptr<obsffmpeg::hwapi::base> api,
-			                                                const AVCodec* codec, AVCodecContext* context);
-
 			virtual void update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
+
+			virtual void override_update(obsffmpeg::encoder* instance, obs_data_t* settings);
 
 			virtual void log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 
-			virtual void import_from_ffmpeg(const std::string ffmpeg, obs_data_t* settings,
-			                                const AVCodec* codec, AVCodecContext* context);
+			public /*instance*/:
 
-			virtual std::string export_for_ffmpeg(obs_data_t* settings, const AVCodec* codec,
-			                                      AVCodecContext* context);
+			virtual void override_colorformat(AVPixelFormat& target_format, obs_data_t* settings,
+			                                  const AVCodec* codec, AVCodecContext* context);
 
 			virtual void process_avpacket(AVPacket& packet, const AVCodec* codec, AVCodecContext* context);
 		};

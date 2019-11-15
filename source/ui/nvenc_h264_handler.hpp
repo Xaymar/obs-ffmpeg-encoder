@@ -33,23 +33,28 @@ extern "C" {
 namespace obsffmpeg {
 	namespace ui {
 		class nvenc_h264_handler : public handler {
-			public:
-			virtual void get_name(const AVCodec* codec, std::string& name) override;
-
-			virtual void override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
-			                                    AVCodecContext* context) override;
+			public /*factory*/:
+			virtual void adjust_encoder_info(obsffmpeg::encoder_factory* factory,
+			                                 obsffmpeg::encoder_info*    main,
+			                                 obsffmpeg::encoder_info*    fallback);
 
 			virtual void get_defaults(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context,
-			                          bool hw_encode) override;
+			                          bool hw_encode);
+
+			public /*settings*/:
+			virtual bool has_keyframe_support(obsffmpeg::encoder* instance);
 
 			virtual void get_properties(obs_properties_t* props, const AVCodec* codec,
-			                            AVCodecContext* context, bool hw_encode) override;
+			                            AVCodecContext* context, bool hw_encode);
 
-			virtual void update(obs_data_t* settings, const AVCodec* codec,
-			                    AVCodecContext* context) override;
+			virtual void update(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 
-			virtual void log_options(obs_data_t* settings, const AVCodec* codec,
-			                         AVCodecContext* context) override;
+			virtual void override_update(obsffmpeg::encoder* instance, obs_data_t* settings);
+
+			virtual void log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
+
+			public /*instance*/:
+			//virtual void override_colorformat(AVPixelFormat& target_format, obs_data_t* settings, const AVCodec* codec, AVCodecContext* context);
 
 			private:
 			void get_encoder_properties(obs_properties_t* props, const AVCodec* codec);

@@ -21,6 +21,7 @@
 
 #include "nvenc_hevc_handler.hpp"
 #include "codecs/hevc.hpp"
+#include "encoder.hpp"
 #include "nvenc_shared.hpp"
 #include "plugin.hpp"
 #include "strings.hpp"
@@ -82,15 +83,11 @@ INITIALIZER(nvenc_hevc_handler_init)
 	});
 };
 
-void obsffmpeg::ui::nvenc_hevc_handler::get_name(const AVCodec*, std::string& name)
+void obsffmpeg::ui::nvenc_hevc_handler::adjust_encoder_info(obsffmpeg::encoder_factory*, obsffmpeg::encoder_info* main,
+                                                            obsffmpeg::encoder_info* fallback)
 {
-	name = "H.265/HEVC Encoder (NVidia NVENC)";
-}
-
-void obsffmpeg::ui::nvenc_hevc_handler::override_lag_in_frames(size_t& lag, obs_data_t* settings, const AVCodec* codec,
-                                                               AVCodecContext* context)
-{
-	nvenc::override_lag_in_frames(lag, settings, codec, context);
+	main->readable_name     = "H.265/HEVC Encoder (Nvidia NVENC) (Hardware)";
+	fallback->readable_name = "H.265/HEVC Encoder (Nvidia NVENC) (Software)";
 }
 
 void obsffmpeg::ui::nvenc_hevc_handler::get_defaults(obs_data_t* settings, const AVCodec* codec,
@@ -101,6 +98,11 @@ void obsffmpeg::ui::nvenc_hevc_handler::get_defaults(obs_data_t* settings, const
 	obs_data_set_default_int(settings, P_HEVC_PROFILE, static_cast<int64_t>(codecs::hevc::profile::MAIN));
 	obs_data_set_default_int(settings, P_HEVC_TIER, static_cast<int64_t>(codecs::hevc::profile::MAIN));
 	obs_data_set_default_int(settings, P_HEVC_LEVEL, static_cast<int64_t>(codecs::hevc::level::UNKNOWN));
+}
+
+bool obsffmpeg::ui::nvenc_hevc_handler::has_keyframe_support(obsffmpeg::encoder*)
+{
+	return true;
 }
 
 void obsffmpeg::ui::nvenc_hevc_handler::get_properties(obs_properties_t* props, const AVCodec* codec,
@@ -137,6 +139,11 @@ void obsffmpeg::ui::nvenc_hevc_handler::update(obs_data_t* settings, const AVCod
 			av_opt_set(context->priv_data, "level", "auto", 0);
 		}
 	}
+}
+
+void obsffmpeg::ui::nvenc_hevc_handler::override_update(obsffmpeg::encoder* instance, obs_data_t* settings)
+{
+	nvenc::override_update(instance, settings);
 }
 
 void obsffmpeg::ui::nvenc_hevc_handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
