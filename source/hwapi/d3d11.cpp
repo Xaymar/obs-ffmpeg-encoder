@@ -169,8 +169,8 @@ AVBufferRef* obsffmpeg::hwapi::d3d11_instance::create_device_context()
 	d3d11va->device->AddRef();
 	d3d11va->device_context = _context;
 	d3d11va->device_context->AddRef();
-	d3d11va->lock   = [](void* lock_ctx) { obs_enter_graphics(); };
-	d3d11va->unlock = [](void* lock_ctx) { obs_leave_graphics(); };
+	d3d11va->lock   = [](void*) { obs_enter_graphics(); };
+	d3d11va->unlock = [](void*) { obs_leave_graphics(); };
 
 	int ret = av_hwdevice_ctx_init(dctx_ref);
 	if (ret < 0)
