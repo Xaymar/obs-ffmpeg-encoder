@@ -270,3 +270,34 @@ void ffmpeg::tools::setup_obs_color(video_colorspace colorspace, video_range_typ
 	// Downscaling should result in downscaling, not pixelation
 	context->chroma_sample_location = AVCHROMA_LOC_CENTER;
 }
+
+const char* ffmpeg::tools::get_std_compliance_name(int compliance)
+{
+	switch (compliance) {
+	case FF_COMPLIANCE_VERY_STRICT:
+		return "Very Strict";
+	case FF_COMPLIANCE_STRICT:
+		return "Strict";
+	case FF_COMPLIANCE_NORMAL:
+		return "Normal";
+	case FF_COMPLIANCE_UNOFFICIAL:
+		return "Unofficial";
+	case FF_COMPLIANCE_EXPERIMENTAL:
+		return "Experimental";
+	}
+	return "Invalid";
+}
+
+const char* ffmpeg::tools::get_thread_type_name(int thread_type)
+{
+	switch (thread_type) {
+	case FF_THREAD_FRAME | FF_THREAD_SLICE:
+		return "Slice & Frame";
+	case FF_THREAD_FRAME:
+		return "Frame";
+	case FF_THREAD_SLICE:
+		return "Slice";
+	default:
+		return "None";
+	}
+}

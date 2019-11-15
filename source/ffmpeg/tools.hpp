@@ -57,6 +57,10 @@ namespace ffmpeg {
 		std::vector<AVPixelFormat> get_software_formats(const AVPixelFormat* list);
 
 		void setup_obs_color(video_colorspace colorspace, video_range_type range, AVCodecContext* context);
+
+		const char* get_std_compliance_name(int compliance);
+
+		const char* get_thread_type_name(int thread_type);
 	} // namespace tools
 } // namespace ffmpeg
 
