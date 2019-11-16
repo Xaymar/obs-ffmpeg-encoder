@@ -24,12 +24,15 @@
 #include <map>
 #include <sstream>
 #include <stdexcept>
+#include "plugin.hpp"
+#include "utility.hpp"
 
 extern "C" {
 #pragma warning(push)
 #pragma warning(disable : 4244)
 #include <libavcodec/avcodec.h>
 #include <libavutil/error.h>
+#include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
 #pragma warning(pop)
 }
@@ -299,5 +302,52 @@ const char* ffmpeg::tools::get_thread_type_name(int thread_type)
 		return "Slice";
 	default:
 		return "None";
+	}
+}
+
+void ffmpeg::tools::print_av_option_bool(AVCodecContext* context, const char* option, std::string text)
+{
+	if (av_opt_is_set_to_default_by_name(context, option, AV_OPT_SEARCH_CHILDREN) == 0) {
+		int64_t v = 0;
+		if (av_opt_get_int(context, option, AV_OPT_SEARCH_CHILDREN, &v) == 0) {
+			PLOG_INFO("[%s] %s: %s", context->codec->name, text.c_str(), v == 0 ? "Disabled" : "Enabled");
+		} else {
+			PLOG_INFO("[%s] %s: <Error>", context->codec->name, text.c_str());
+		}
+	} else {
+		PLOG_INFO("[%s] %s: <Default>", context->codec->name, text.c_str());
+	}
+}
+
+void ffmpeg::tools::print_av_option_int(AVCodecContext* context, const char* option, std::string text,
+                                        std::string suffix)
+{
+	if (av_opt_is_set_to_default_by_name(context, option, AV_OPT_SEARCH_CHILDREN) == 0) {
+		int64_t v = 0;
+		if (av_opt_get_int(context, option, AV_OPT_SEARCH_CHILDREN, &v) == 0) {
+			PLOG_INFO("[%s] %s: %lld %s", context->codec->name, text.c_str(), v, suffix.c_str());
+		} else {
+			PLOG_INFO("[%s] %s: <Error>", context->codec->name, text.c_str());
+		}
+	} else {
+		PLOG_INFO("[%s] %s: <Default>", context->codec->name, text.c_str());
+	}
+}
+
+void ffmpeg::tools::print_av_option_string(AVCodecContext* context, const char* option, std::string text,
+                                           std::function<std::string(int64_t)> decoder)
+{
+	if (av_opt_is_set_to_default_by_name(context, option, AV_OPT_SEARCH_CHILDREN) == 0) {
+		int64_t v = 0;
+		if (av_opt_get_int(context, option, AV_OPT_SEARCH_CHILDREN, &v) == 0) {
+			std::string name = "<Unknown>";
+			if (decoder)
+				name = decoder(v);
+			PLOG_INFO("[%s] %s: %s", context->codec->name, text.c_str(), name.c_str());
+		} else {
+			PLOG_INFO("[%s] %s: <Error>", context->codec->name, text.c_str());
+		}
+	} else {
+		PLOG_INFO("[%s] %s: <Default>", context->codec->name, text.c_str());
 	}
 }

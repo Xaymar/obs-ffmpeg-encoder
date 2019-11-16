@@ -23,6 +23,7 @@
 #define OBS_FFMPEG_FFMPEG_UTILITY
 #pragma once
 
+#include <functional>
 #include <obs.h>
 #include <string>
 #include <vector>
@@ -61,6 +62,15 @@ namespace ffmpeg {
 		const char* get_std_compliance_name(int compliance);
 
 		const char* get_thread_type_name(int thread_type);
+
+		void print_av_option_bool(AVCodecContext* context, const char* option, std::string text);
+
+		void print_av_option_int(AVCodecContext* context, const char* option, std::string text,
+		                                std::string suffix);
+
+		void print_av_option_string(AVCodecContext* context, const char* option, std::string text,
+		                                   std::function<std::string(int64_t)> decoder);
+
 	} // namespace tools
 } // namespace ffmpeg
 
