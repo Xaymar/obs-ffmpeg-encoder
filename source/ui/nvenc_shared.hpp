@@ -48,6 +48,8 @@ namespace obsffmpeg {
 			LOW_LATENCY_HIGH_QUALITY,
 			LOSSLESS,
 			LOSSLESS_HIGH_PERFORMANCE,
+			// Append things before this.
+			INVALID = -1,
 		};
 
 		enum class ratecontrolmode : int64_t {
@@ -57,12 +59,16 @@ namespace obsffmpeg {
 			CBR,
 			CBR_HQ,
 			CBR_LD_HQ,
+			// Append things before this.
+			INVALID = -1,
 		};
 
 		enum class b_ref_mode : int64_t {
 			DISABLED,
 			EACH,
 			MIDDLE,
+			// Append things before this.
+			INVALID = -1,
 		};
 
 		extern std::map<preset, std::string> presets;

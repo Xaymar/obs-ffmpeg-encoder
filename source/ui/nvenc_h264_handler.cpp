@@ -22,6 +22,7 @@
 #include "nvenc_h264_handler.hpp"
 #include "codecs/h264.hpp"
 #include "encoder.hpp"
+#include "ffmpeg/tools.hpp"
 #include "nvenc_shared.hpp"
 #include "plugin.hpp"
 #include "strings.hpp"
@@ -35,30 +36,7 @@ extern "C" {
 #pragma warning(pop)
 }
 
-/* Missing Options:
-
-Seem to be covered by initQP_* instead.
-- [obs-ffmpeg-encoder]   Option 'cq' with help 'Set target quality level (0 to 51, 0 means automatic) for constant quality mode in VBR rate control' of type 'Float' with default value '0.000000', minimum '0.000000' and maximum '51.000000'.
-- [obs-ffmpeg-encoder]   Option 'qp' with help 'Constant quantization parameter rate control method' of type 'Int' with default value '-1', minimum '-1.000000' and maximum '51.000000'.
-
-Not sure what there are useful for.
-[obs-ffmpeg-encoder]   Option 'aud' with help 'Use access unit delimiters' of type 'Bool' with default value 'false', minimum '0.000000' and maximum '1.000000'.
-[obs-ffmpeg-encoder]   Option 'surfaces' with help 'Number of concurrent surfaces' of type 'Int' with default value '0', minimum '0.000000' and maximum '64.000000'.
-[obs-ffmpeg-encoder]   Option 'delay' with help 'Delay frame output by the given amount of frames' of type 'Int' with default value '2147483647', minimum '0.000000' and maximum '2147483647.000000'.
-
-Should probably add this.
-[obs-ffmpeg-encoder]   Option 'gpu' with unit (gpu) with help 'Selects which NVENC capable GPU to use. First GPU is 0, second is 1, and so on.' of type 'Int' with default value '-1', minimum '-2.000000' and maximum '2147483647.000000'.
-[obs-ffmpeg-encoder]   [gpu] Constant 'any' and help text 'Pick the first device available' with value '-1'.
-[obs-ffmpeg-encoder]   [gpu] Constant 'list' and help text 'List the available devices' with value '-2'.
-
-Useless except for strict_gop maybe?
-[obs-ffmpeg-encoder]   Option 'forced-idr' with help 'If forcing keyframes, force them as IDR frames.' of type 'Bool' with default value 'false', minimum '-1.000000' and maximum '1.000000'.
-[obs-ffmpeg-encoder]   Option 'strict_gop' with help 'Set 1 to minimize GOP-to-GOP rate fluctuations' of type 'Bool' with default value 'false', minimum '0.000000' and maximum '1.000000'.
-[obs-ffmpeg-encoder]   Option 'bluray-compat' with help 'Bluray compatibility workarounds' of type 'Bool' with default value 'false', minimum '0.000000' and maximum '1.000000'.
-*/
-
 using namespace obsffmpeg::codecs::h264;
-using namespace obsffmpeg::nvenc;
 
 std::map<profile, std::string> profiles{
     {profile::BASELINE, "baseline"},
@@ -143,16 +121,21 @@ void obsffmpeg::ui::nvenc_h264_handler::log_options(obs_data_t* settings, const 
 {
 	nvenc::log_options(settings, codec, context);
 
-	profile cfg_profile = static_cast<profile>(obs_data_get_int(settings, P_H264_PROFILE));
-	level   cfg_level   = static_cast<level>(obs_data_get_int(settings, P_H264_LEVEL));
-
-	auto found1 = profiles.find(cfg_profile);
-	if (found1 != profiles.end())
-		PLOG_INFO("[%s]   H.264 Profile: %s", codec->name, found1->second.c_str());
-
-	auto found2 = levels.find(cfg_level);
-	if (found2 != levels.end())
-		PLOG_INFO("[%s]   H.264 Level: %s", codec->name, found2->second.c_str());
+	PLOG_INFO("[%s]     H.265/HEVC:", codec->name);
+	ffmpeg::tools::print_av_option_string(context, "profile", "      Profile", [](int64_t v) {
+		profile val   = static_cast<profile>(v);
+		auto    index = profiles.find(val);
+		if (index != profiles.end())
+			return index->second;
+		return std::string("<Unknown>");
+	});
+	ffmpeg::tools::print_av_option_string(context, "level", "      Level", [](int64_t v) {
+		level val   = static_cast<level>(v);
+		auto  index = levels.find(val);
+		if (index != levels.end())
+			return index->second;
+		return std::string("<Unknown>");
+	});
 }
 
 void obsffmpeg::ui::nvenc_h264_handler::get_encoder_properties(obs_properties_t* props, const AVCodec* codec)

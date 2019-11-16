@@ -23,6 +23,7 @@
 #include <algorithm>
 #include "codecs/hevc.hpp"
 #include "encoder.hpp"
+#include "ffmpeg/tools.hpp"
 #include "plugin.hpp"
 #include "strings.hpp"
 #include "utility.hpp"
@@ -138,7 +139,7 @@ void obsffmpeg::nvenc::override_update(obsffmpeg::encoder* instance, obs_data_t*
 	AVCodecContext* context = const_cast<AVCodecContext*>(instance->get_avcodeccontext());
 
 	int64_t rclookahead = 0;
-	int64_t surfaces = 0;
+	int64_t surfaces    = 0;
 	int64_t async_depth = 0;
 
 	av_opt_get_int(context, "rc-lookahead", AV_OPT_SEARCH_CHILDREN, &rclookahead);
@@ -170,8 +171,8 @@ void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, const AVCodec*, AVCode
 	obs_data_set_default_int(settings, ST_RATECONTROL_MODE, static_cast<int64_t>(ratecontrolmode::CBR_HQ));
 	obs_data_set_default_int(settings, ST_RATECONTROL_TWOPASS, -1);
 	obs_data_set_default_int(settings, ST_RATECONTROL_LOOKAHEAD, 0);
-	obs_data_set_default_bool(settings, ST_RATECONTROL_ADAPTIVEI, true);
-	obs_data_set_default_bool(settings, ST_RATECONTROL_ADAPTIVEB, true);
+	obs_data_set_default_int(settings, ST_RATECONTROL_ADAPTIVEI, -1);
+	obs_data_set_default_int(settings, ST_RATECONTROL_ADAPTIVEB, -1);
 
 	obs_data_set_default_int(settings, ST_RATECONTROL_BITRATE_TARGET, 6000);
 	obs_data_set_default_int(settings, ST_RATECONTROL_BITRATE_MAXIMUM, 6000);
@@ -188,15 +189,15 @@ void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, const AVCodec*, AVCode
 	obs_data_set_default_int(settings, ST_RATECONTROL_QP_B, 21);
 	obs_data_set_default_int(settings, ST_RATECONTROL_QP_B_INITIAL, -1);
 
-	obs_data_set_default_bool(settings, ST_AQ_SPATIAL, true);
+	obs_data_set_default_int(settings, ST_AQ_SPATIAL, -1);
 	obs_data_set_default_int(settings, ST_AQ_STRENGTH, 8);
-	obs_data_set_default_bool(settings, ST_AQ_TEMPORAL, true);
+	obs_data_set_default_int(settings, ST_AQ_TEMPORAL, -1);
 
 	obs_data_set_default_int(settings, ST_OTHER_BFRAMES, 2);
 	obs_data_set_default_int(settings, ST_OTHER_BFRAME_REFERENCEMODE, static_cast<int64_t>(b_ref_mode::DISABLED));
-	obs_data_set_default_bool(settings, ST_OTHER_ZEROLATENCY, false);
-	obs_data_set_default_bool(settings, ST_OTHER_WEIGHTED_PREDICTION, false);
-	obs_data_set_default_bool(settings, ST_OTHER_NONREFERENCE_PFRAMES, false);
+	obs_data_set_default_int(settings, ST_OTHER_ZEROLATENCY, -1);
+	obs_data_set_default_int(settings, ST_OTHER_WEIGHTED_PREDICTION, -1);
+	obs_data_set_default_int(settings, ST_OTHER_NONREFERENCE_PFRAMES, -1);
 }
 
 static bool modified_ratecontrol(obs_properties_t* props, obs_property_t*, obs_data_t* settings)
@@ -259,7 +260,7 @@ static bool modified_quality(obs_properties_t* props, obs_property_t*, obs_data_
 
 static bool modified_aq(obs_properties_t* props, obs_property_t*, obs_data_t* settings)
 {
-	bool spatial_aq = obs_data_get_bool(settings, ST_AQ_SPATIAL);
+	bool spatial_aq = obs_data_get_int(settings, ST_AQ_SPATIAL) == 1;
 	obs_property_set_visible(obs_properties_get(props, ST_AQ_STRENGTH), spatial_aq);
 	return true;
 }
@@ -298,12 +299,9 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, const AVCode
 		}
 
 		{
-			auto p = obs_properties_add_list(grp, ST_RATECONTROL_TWOPASS, TRANSLATE(ST_RATECONTROL_TWOPASS),
-			                                 OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+			auto p = obsffmpeg::obs_properties_add_tristate(grp, ST_RATECONTROL_TWOPASS,
+			                                                TRANSLATE(ST_RATECONTROL_TWOPASS));
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_RATECONTROL_TWOPASS)));
-			obs_property_list_add_int(p, TRANSLATE(S_STATE_DEFAULT), -1);
-			obs_property_list_add_int(p, TRANSLATE(S_STATE_DISABLED), 0);
-			obs_property_list_add_int(p, TRANSLATE(S_STATE_ENABLED), 1);
 		}
 
 		{
@@ -313,13 +311,13 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, const AVCode
 			obs_property_int_set_suffix(p, " frames");
 		}
 		{
-			auto p =
-			    obs_properties_add_bool(grp, ST_RATECONTROL_ADAPTIVEI, TRANSLATE(ST_RATECONTROL_ADAPTIVEI));
+			auto p = obsffmpeg::obs_properties_add_tristate(grp, ST_RATECONTROL_ADAPTIVEI,
+			                                                TRANSLATE(ST_RATECONTROL_ADAPTIVEI));
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_RATECONTROL_ADAPTIVEI)));
 		}
 		if (strcmp(codec->name, "h264_nvenc") == 0) {
-			auto p =
-			    obs_properties_add_bool(grp, ST_RATECONTROL_ADAPTIVEB, TRANSLATE(ST_RATECONTROL_ADAPTIVEB));
+			auto p = obsffmpeg::obs_properties_add_tristate(grp, ST_RATECONTROL_ADAPTIVEB,
+			                                                TRANSLATE(ST_RATECONTROL_ADAPTIVEB));
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_RATECONTROL_ADAPTIVEB)));
 		}
 	}
@@ -435,7 +433,7 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, const AVCode
 		}
 
 		{
-			auto p = obs_properties_add_bool(grp, ST_AQ_SPATIAL, TRANSLATE(ST_AQ_SPATIAL));
+			auto p = obsffmpeg::obs_properties_add_tristate(grp, ST_AQ_SPATIAL, TRANSLATE(ST_AQ_SPATIAL));
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_AQ_SPATIAL)));
 			obs_property_set_modified_callback(p, modified_aq);
 		}
@@ -445,7 +443,7 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, const AVCode
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_AQ_STRENGTH)));
 		}
 		{
-			auto p = obs_properties_add_bool(grp, ST_AQ_TEMPORAL, TRANSLATE(ST_AQ_TEMPORAL));
+			auto p = obsffmpeg::obs_properties_add_tristate(grp, ST_AQ_TEMPORAL, TRANSLATE(ST_AQ_TEMPORAL));
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_AQ_TEMPORAL)));
 		}
 	}
@@ -476,19 +474,20 @@ void obsffmpeg::nvenc::get_properties_post(obs_properties_t* props, const AVCode
 		}
 
 		{
-			auto p = obs_properties_add_bool(grp, ST_OTHER_ZEROLATENCY, TRANSLATE(ST_OTHER_ZEROLATENCY));
+			auto p = obsffmpeg::obs_properties_add_tristate(grp, ST_OTHER_ZEROLATENCY,
+			                                                TRANSLATE(ST_OTHER_ZEROLATENCY));
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_OTHER_ZEROLATENCY)));
 		}
 
 		{
-			auto p = obs_properties_add_bool(grp, ST_OTHER_WEIGHTED_PREDICTION,
-			                                 TRANSLATE(ST_OTHER_WEIGHTED_PREDICTION));
+			auto p = obsffmpeg::obs_properties_add_tristate(grp, ST_OTHER_WEIGHTED_PREDICTION,
+			                                                TRANSLATE(ST_OTHER_WEIGHTED_PREDICTION));
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_OTHER_WEIGHTED_PREDICTION)));
 		}
 
 		{
-			auto p = obs_properties_add_bool(grp, ST_OTHER_NONREFERENCE_PFRAMES,
-			                                 TRANSLATE(ST_OTHER_NONREFERENCE_PFRAMES));
+			auto p = obsffmpeg::obs_properties_add_tristate(grp, ST_OTHER_NONREFERENCE_PFRAMES,
+			                                                TRANSLATE(ST_OTHER_NONREFERENCE_PFRAMES));
 			obs_property_set_long_description(p, TRANSLATE(DESC(ST_OTHER_NONREFERENCE_PFRAMES)));
 		}
 	}
@@ -555,6 +554,7 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCode
 			av_opt_set(context->priv_data, "rc", rcopt->second.c_str(), 0);
 		}
 
+		av_opt_set_int(context->priv_data, "cbr", 0, 0);
 		switch (rc) {
 		case ratecontrolmode::CQP:
 			have_qp = true;
@@ -580,14 +580,18 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCode
 		}
 
 		int la = static_cast<int>(obs_data_get_int(settings, ST_RATECONTROL_LOOKAHEAD));
-		av_opt_set_int(context->priv_data, "lookahead", la, 0);
+		av_opt_set_int(context->priv_data, "rc-lookahead", la, 0);
 		if (la > 0) {
-			bool adapt_i = obs_data_get_bool(settings, ST_RATECONTROL_ADAPTIVEI);
-			av_opt_set_int(context->priv_data, "no-scenecut", !adapt_i ? 1 : 0, 0);
+			int64_t adapt_i = obs_data_get_int(settings, ST_RATECONTROL_ADAPTIVEI);
+			if (!is_tristate_default(adapt_i)) {
+				av_opt_set_int(context->priv_data, "no-scenecut", adapt_i, AV_OPT_SEARCH_CHILDREN);
+			}
 
 			if (strcmp(codec->name, "h264_nvenc")) {
-				bool adapt_b = obs_data_get_bool(settings, ST_RATECONTROL_ADAPTIVEB);
-				av_opt_set_int(context->priv_data, "b_adapt", adapt_b ? 1 : 0, 0);
+				int64_t adapt_b = obs_data_get_int(settings, ST_RATECONTROL_ADAPTIVEB);
+				if (!is_tristate_default(adapt_b)) {
+					av_opt_set_int(context->priv_data, "b_adapt", adapt_b, AV_OPT_SEARCH_CHILDREN);
+				}
 			}
 		}
 
@@ -636,37 +640,42 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCode
 	}
 
 	{ // AQ
-		bool saq = obs_data_get_bool(settings, ST_AQ_SPATIAL);
-		bool taq = obs_data_get_bool(settings, ST_AQ_TEMPORAL);
+		int64_t saq = obs_data_get_int(settings, ST_AQ_SPATIAL);
+		int64_t taq = obs_data_get_int(settings, ST_AQ_TEMPORAL);
 
-		if (strcmp(codec->name, "h264_nvenc")) {
-			av_opt_set_int(context->priv_data, "spatial-aq", saq ? 1 : 0, 0);
-			av_opt_set_int(context->priv_data, "temporal-aq", taq ? 1 : 0, 0);
+		if (strcmp(codec->name, "h264_nvenc") == 0) {
+			if (!is_tristate_default(saq))
+				av_opt_set_int(context->priv_data, "spatial-aq", saq, 0);
+			if (!is_tristate_default(taq))
+				av_opt_set_int(context->priv_data, "temporal-aq", taq, 0);
 		} else {
-			av_opt_set_int(context->priv_data, "spatial_aq", saq ? 1 : 0, 0);
-			av_opt_set_int(context->priv_data, "temporal_aq", taq ? 1 : 0, 0);
+			if (!is_tristate_default(saq))
+				av_opt_set_int(context->priv_data, "spatial_aq", saq, 0);
+			if (!is_tristate_default(taq))
+				av_opt_set_int(context->priv_data, "temporal_aq", taq, 0);
 		}
-		if (saq) {
+		if (is_tristate_enabled(saq))
 			av_opt_set_int(context->priv_data, "aq-strength",
 			               static_cast<int>(obs_data_get_int(settings, ST_AQ_STRENGTH)), 0);
-		}
 	}
 
 	{ // Other
-		bool zl  = obs_data_get_bool(settings, ST_OTHER_ZEROLATENCY);
-		bool wp  = obs_data_get_bool(settings, ST_OTHER_WEIGHTED_PREDICTION);
-		bool nrp = obs_data_get_bool(settings, ST_OTHER_NONREFERENCE_PFRAMES);
+		int64_t zl  = obs_data_get_int(settings, ST_OTHER_ZEROLATENCY);
+		int64_t wp  = obs_data_get_int(settings, ST_OTHER_WEIGHTED_PREDICTION);
+		int64_t nrp = obs_data_get_int(settings, ST_OTHER_NONREFERENCE_PFRAMES);
 
 		context->max_b_frames = static_cast<int>(obs_data_get_int(settings, ST_OTHER_BFRAMES));
 
-		av_opt_set_int(context->priv_data, "zerolatency", zl ? 1 : 0, 0);
-		av_opt_set_int(context->priv_data, "nonref_p", nrp ? 1 : 0, 0);
+		if (!is_tristate_default(zl))
+			av_opt_set_int(context->priv_data, "zerolatency", zl, 0);
+		if (!is_tristate_default(nrp))
+			av_opt_set_int(context->priv_data, "nonref_p", nrp, 0);
 
-		if ((context->max_b_frames != 0) && wp) {
-			PLOG_WARNING(
-			    "Automatically disabled weighted prediction due to being incompatible with B-Frames.");
-		} else {
-			av_opt_set_int(context->priv_data, "weighted_pred", wp ? 1 : 0, 0);
+		if ((context->max_b_frames != 0) && is_tristate_enabled(wp)) {
+			PLOG_WARNING("[%s] Weighted Prediction disabled because of B-Frames being used.", codec->name);
+			av_opt_set_int(context->priv_data, "weighted_pred", 0, 0);
+		} else if (!is_tristate_default(wp)) {
+			av_opt_set_int(context->priv_data, "weighted_pred", wp, 0);
 		}
 
 		{
@@ -679,112 +688,73 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCode
 	}
 }
 
-void obsffmpeg::nvenc::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
+void obsffmpeg::nvenc::log_options(obs_data_t*, const AVCodec* codec, AVCodecContext* context)
 {
-	preset cfg_preset = static_cast<preset>(obs_data_get_int(settings, ST_PRESET));
+	PLOG_INFO("[%s]   Nvidia NVENC:", codec->name);
+	ffmpeg::tools::print_av_option_string(context, "preset", "    Preset", [](int64_t v) {
+		preset      val   = static_cast<preset>(v);
+		std::string name  = "<Unknown>";
+		auto        index = preset_to_opt.find(val);
+		if (index != preset_to_opt.end())
+			name = index->second;
+		return name;
+	});
+	ffmpeg::tools::print_av_option_string(context, "rc", "    Rate Control", [](int64_t v) {
+		ratecontrolmode val   = static_cast<ratecontrolmode>(v);
+		std::string     name  = "<Unknown>";
+		auto            index = ratecontrolmode_to_opt.find(val);
+		if (index != ratecontrolmode_to_opt.end())
+			name = index->second;
+		return name;
+	});
+	ffmpeg::tools::print_av_option_bool(context, "2pass", "      Two Pass");
+	ffmpeg::tools::print_av_option_int(context, "rc-lookahead", "      Look-Ahead", "Frames");
+	ffmpeg::tools::print_av_option_bool(context, "no-scenecut", "      Adaptive I-Frames");
+	if (strcmp(codec->name, "h264_nvenc") == 0)
+		ffmpeg::tools::print_av_option_bool(context, "b_adapt", "      Adaptive B-Frames");
 
-	auto found1 = preset_to_opt.find(cfg_preset);
-	if (found1 != preset_to_opt.end())
-		PLOG_INFO("[%s]   Preset: %s", codec->name, found1->second.c_str());
+	PLOG_INFO("[%s]       Bitrate:", codec->name);
+	ffmpeg::tools::print_av_option_int(context, "bitrate", "        Target", "bits/sec");
+	ffmpeg::tools::print_av_option_int(context, "rc_max_rate", "        Maximum", "bits/sec");
+	ffmpeg::tools::print_av_option_int(context, "rc_buffer_size", "        Buffer", "bits");
+	PLOG_INFO("[%s]       Quality:", codec->name);
+	ffmpeg::tools::print_av_option_int(context, "qmin", "        Minimum", "");
+	ffmpeg::tools::print_av_option_int(context, "cq", "        Target", "");
+	ffmpeg::tools::print_av_option_int(context, "qmax", "        Maximum", "");
+	PLOG_INFO("[%s]       Quantization Parameters:", codec->name);
+	ffmpeg::tools::print_av_option_int(context, "init_qpI", "        I-Frame", "");
+	ffmpeg::tools::print_av_option_int(context, "init_qpP", "        P-Frame", "");
+	ffmpeg::tools::print_av_option_int(context, "init_qpB", "        B-Frame", "");
 
-	ratecontrolmode cfg_rc_mode   = static_cast<ratecontrolmode>(obs_data_get_int(settings, ST_RATECONTROL_MODE));
-	int64_t         cfg_rc_2pass  = obs_data_get_int(settings, ST_RATECONTROL_TWOPASS);
-	int64_t         cfg_rc_lahead = obs_data_get_int(settings, ST_RATECONTROL_LOOKAHEAD);
-	bool            cfg_rc_adapti = obs_data_get_bool(settings, ST_RATECONTROL_ADAPTIVEI);
-	bool            cfg_rc_adaptb = obs_data_get_bool(settings, ST_RATECONTROL_ADAPTIVEB);
+	ffmpeg::tools::print_av_option_int(context, "max_b_frames", "    B-Frames", "Frames");
+	ffmpeg::tools::print_av_option_string(context, "b_ref_mode", "      Reference Mode", [](int64_t v) {
+		b_ref_mode  val   = static_cast<b_ref_mode>(v);
+		std::string name  = "<Unknown>";
+		auto        index = b_ref_mode_to_opt.find(val);
+		if (index != b_ref_mode_to_opt.end())
+			name = index->second;
+		return name;
+	});
 
-	auto found2 = ratecontrolmode_to_opt.find(cfg_rc_mode);
-	if (found2 != ratecontrolmode_to_opt.end())
-		PLOG_INFO("[%s]   Rate Control: %s", codec->name, found2->second.c_str());
-	PLOG_INFO("[%s]     Two Pass: %s", codec->name,
-	          cfg_rc_2pass == 1 ? "Enabled" : (cfg_rc_2pass == 0 ? "Disabled" : "Default"));
-	PLOG_INFO("[%s]     Lookahead: %" PRId64 " Frames", codec->name, cfg_rc_lahead);
-	if (cfg_rc_adapti && cfg_rc_lahead > 0)
-		PLOG_INFO("[%s]       Adaptive I-Frames Enabled", codec->name);
-	if (cfg_rc_adaptb && cfg_rc_lahead > 0)
-		PLOG_INFO("[%s]       Adaptive B-Frames Enabled", codec->name);
-
-	int64_t  cfg_rc_bitrate     = obs_data_get_int(settings, ST_RATECONTROL_BITRATE_TARGET);
-	int64_t  cfg_rc_max_bitrate = obs_data_get_int(settings, ST_RATECONTROL_BITRATE_MAXIMUM);
-	int64_t  cfg_rc_bufsize     = obs_data_get_int(settings, S_RATECONTROL_BUFFERSIZE);
-	bool     cfg_rc_quality     = obs_data_get_bool(settings, ST_RATECONTROL_QUALITY);
-	int64_t  cfg_rc_quality_min = obs_data_get_int(settings, ST_RATECONTROL_QUALITY_MINIMUM);
-	int64_t  cfg_rc_quality_max = obs_data_get_int(settings, ST_RATECONTROL_QUALITY_MAXIMUM);
-	double_t cfg_rc_quality_tgt = obs_data_get_double(settings, ST_RATECONTROL_QUALITY_TARGET) / 100.0 * 51.0;
-	int64_t  cfg_rc_qp_i        = obs_data_get_int(settings, ST_RATECONTROL_QP_I);
-	int64_t  cfg_rc_qp_p        = obs_data_get_int(settings, ST_RATECONTROL_QP_P);
-	int64_t  cfg_rc_qp_b        = obs_data_get_int(settings, ST_RATECONTROL_QP_B);
-	int64_t  cfg_rc_qp_i_init   = obs_data_get_int(settings, ST_RATECONTROL_QP_I_INITIAL);
-	int64_t  cfg_rc_qp_p_init   = obs_data_get_int(settings, ST_RATECONTROL_QP_P_INITIAL);
-	int64_t  cfg_rc_qp_b_init   = obs_data_get_int(settings, ST_RATECONTROL_QP_B_INITIAL);
-
-	{
-		bool have_bitrate     = false;
-		bool have_bitrate_max = false;
-		bool have_quality     = false;
-		bool have_qp          = false;
-		bool have_qp_init     = false;
-
-		switch (cfg_rc_mode) {
-		case ratecontrolmode::CQP:
-			have_qp = true;
-			break;
-		case ratecontrolmode::CBR:
-		case ratecontrolmode::CBR_HQ:
-		case ratecontrolmode::CBR_LD_HQ:
-			have_bitrate = true;
-			av_opt_set_int(context->priv_data, "cbr", 1, 0);
-			break;
-		case ratecontrolmode::VBR:
-		case ratecontrolmode::VBR_HQ:
-			have_bitrate_max = true;
-			have_bitrate     = true;
-			have_quality     = true;
-			have_qp_init     = true;
-			break;
-		}
-
-		PLOG_INFO("[%s]   Buffer Size: %" PRId64, codec->name, cfg_rc_bufsize);
-		if (have_bitrate)
-			PLOG_INFO("[%s]   Bitrate Target: %" PRId64, codec->name, cfg_rc_bitrate);
-		if (have_bitrate_max)
-			PLOG_INFO("[%s]   Bitrate Maximum: %" PRId64, codec->name, cfg_rc_max_bitrate);
-		if (have_quality && cfg_rc_quality) {
-			PLOG_INFO("[%s]   Quality Limits:", codec->name);
-			PLOG_INFO("[%s]     Minimum: %" PRId64, codec->name, cfg_rc_quality_min);
-			PLOG_INFO("[%s]     Maximum: %" PRId64, codec->name, cfg_rc_quality_max);
-			PLOG_INFO("[%s]     Target: %f", codec->name, cfg_rc_quality_tgt);
-		}
-		if (have_qp)
-			PLOG_INFO("[%s]   QP Values: %" PRId64 "/%" PRId64 "/%" PRId64, codec->name, cfg_rc_qp_i,
-			          cfg_rc_qp_p, cfg_rc_qp_b);
-		if (have_qp_init)
-			PLOG_INFO("[%s]   Initial QP Values: %" PRId64 "/%" PRId64 "/%" PRId64, codec->name,
-			          cfg_rc_qp_i_init, cfg_rc_qp_p_init, cfg_rc_qp_b_init);
+	PLOG_INFO("[%s]     Adaptive Quantization:", codec->name);
+	if (strcmp(codec->name, "h264_nvenc") == 0) {
+		ffmpeg::tools::print_av_option_bool(context, "spatial-aq", "      Spatial AQ");
+		ffmpeg::tools::print_av_option_int(context, "aq-strength", "        Strength", "");
+		ffmpeg::tools::print_av_option_bool(context, "temporal-aq", "      Temporal AQ");
+	} else {
+		ffmpeg::tools::print_av_option_bool(context, "spatial_aq", "      Spatial AQ");
+		ffmpeg::tools::print_av_option_int(context, "aq-strength", "        Strength", "");
+		ffmpeg::tools::print_av_option_bool(context, "temporal_aq", "      Temporal AQ");
 	}
 
-	bool    cfg_aq_spatial  = obs_data_get_bool(settings, ST_AQ_SPATIAL);
-	int64_t cfg_aq_strength = obs_data_get_int(settings, ST_AQ_STRENGTH);
-	bool    cfg_aq_temporal = obs_data_get_bool(settings, ST_AQ_TEMPORAL);
-	if (cfg_aq_spatial)
-		PLOG_INFO("[%s]   Spatial AQ Enabled: Strength %" PRId64, codec->name, cfg_aq_strength);
-	if (cfg_aq_temporal)
-		PLOG_INFO("[%s]   Temporal AQ Enabled", codec->name);
-
-	int64_t    cfg_bf          = obs_data_get_int(settings, ST_OTHER_BFRAMES);
-	b_ref_mode cfg_bf_mode     = static_cast<b_ref_mode>(obs_data_get_int(settings, ST_OTHER_BFRAME_REFERENCEMODE));
-	bool       cfg_zerolatency = obs_data_get_bool(settings, ST_OTHER_ZEROLATENCY);
-	bool       cfg_weightp     = obs_data_get_bool(settings, ST_OTHER_WEIGHTED_PREDICTION);
-	bool       cfg_nonrefp     = obs_data_get_bool(settings, ST_OTHER_NONREFERENCE_PFRAMES);
-
-	PLOG_INFO("[%s]   B-Frames: %" PRId64, codec->name, cfg_bf);
-	auto found3 = b_ref_mode_to_opt.find(cfg_bf_mode);
-	if (found3 != b_ref_mode_to_opt.end())
-		PLOG_INFO("[%s]     Reference Mode: %s", codec->name, found3->second.c_str());
-	if (cfg_zerolatency)
-		PLOG_INFO("[%s]   Zero Latency Enabled", codec->name);
-	if (cfg_weightp)
-		PLOG_INFO("[%s]   Weighted Prediction Enabled", codec->name);
-	if (cfg_nonrefp)
-		PLOG_INFO("[%s]   Non-Ref P-Frames Enabled", codec->name);
+	PLOG_INFO("[%s]     Other:", codec->name);
+	ffmpeg::tools::print_av_option_bool(context, "zerolatency", "      Zero Latency");
+	ffmpeg::tools::print_av_option_bool(context, "weighted_pred", "      Weighted Prediction");
+	ffmpeg::tools::print_av_option_bool(context, "nonref_p", "      Non-reference P-Frames");
+	ffmpeg::tools::print_av_option_bool(context, "strict_gop", "      Strict GOP");
+	ffmpeg::tools::print_av_option_bool(context, "aud", "      Access Unit Delimiters");
+	ffmpeg::tools::print_av_option_bool(context, "bluray-compat", "      Bluray Compatibility");
+	if (strcmp(codec->name, "h264_nvenc") == 0)
+		ffmpeg::tools::print_av_option_bool(context, "a53cc", "      A53 Closed Captions");
+	ffmpeg::tools::print_av_option_int(context, "dpb_size", "      DPB Size", "");
 }
