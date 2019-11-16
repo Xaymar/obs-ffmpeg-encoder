@@ -696,7 +696,7 @@ void obsffmpeg::encoder::initialize_hw(obs_data_t*)
 	_context->framerate.den = _context->time_base.num = voi->fps_den;
 	ffmpeg::tools::setup_obs_color(voi->colorspace, voi->range, _context);
 	_context->sw_pix_fmt = ffmpeg::tools::obs_videoformat_to_avpixelformat(voi->format);
-
+	
 #ifdef WIN32
 	_context->pix_fmt = AV_PIX_FMT_D3D11;
 #endif
@@ -972,10 +972,10 @@ bool obsffmpeg::encoder::update(obs_data_t* settings)
 
 		PLOG_INFO("[%s]   Keyframes: ", _codec->name);
 		if (_context->keyint_min != _context->gop_size) {
-			PLOG_INFO("[%s]     Minimum: %i frames", _context->keyint_min);
-			PLOG_INFO("[%s]     Maximum: %i frames", _context->gop_size);
+			PLOG_INFO("[%s]     Minimum: %i frames", _codec->name, _context->keyint_min);
+			PLOG_INFO("[%s]     Maximum: %i frames", _codec->name, _context->gop_size);
 		} else {
-			PLOG_INFO("[%s]     Distance: %i frames", _context->gop_size);
+			PLOG_INFO("[%s]     Distance: %i frames", _codec->name, _context->gop_size);
 		}
 		_handler->log_options(settings, _codec, _context);
 	}
