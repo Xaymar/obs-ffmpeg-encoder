@@ -84,8 +84,8 @@ INITIALIZER(nvenc_h264_handler_init)
 void obsffmpeg::ui::nvenc_h264_handler::adjust_encoder_info(obsffmpeg::encoder_factory*, obsffmpeg::encoder_info* main,
                                                             obsffmpeg::encoder_info* fallback)
 {
-	main->readable_name     = "H.264/AVC Encoder (NVidia NVENC) (Hardware)";
-	fallback->readable_name = "H.264/AVC Encoder (NVidia NVENC) (Software)";
+	main->readable_name     = "H.264/AVC NVidia NVENC (Hardware)";
+	fallback->readable_name = "H.264/AVC NVidia NVENC (Software)";
 }
 
 void obsffmpeg::ui::nvenc_h264_handler::get_defaults(obs_data_t* settings, const AVCodec* codec,

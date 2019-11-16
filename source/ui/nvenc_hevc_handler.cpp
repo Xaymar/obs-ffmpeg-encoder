@@ -86,8 +86,8 @@ INITIALIZER(nvenc_hevc_handler_init)
 void obsffmpeg::ui::nvenc_hevc_handler::adjust_encoder_info(obsffmpeg::encoder_factory*, obsffmpeg::encoder_info* main,
                                                             obsffmpeg::encoder_info* fallback)
 {
-	main->readable_name     = "H.265/HEVC Encoder (Nvidia NVENC) (Hardware)";
-	fallback->readable_name = "H.265/HEVC Encoder (Nvidia NVENC) (Software)";
+	main->readable_name     = "H.265/HEVC Nvidia NVENC (Hardware)";
+	fallback->readable_name = "H.265/HEVC Nvidia NVENC (Software)";
 }
 
 void obsffmpeg::ui::nvenc_hevc_handler::get_defaults(obs_data_t* settings, const AVCodec* codec,
