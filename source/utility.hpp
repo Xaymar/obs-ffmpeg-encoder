@@ -100,4 +100,16 @@ namespace obsffmpeg {
 	};
 
 	obs_property_t* obs_properties_add_tristate(obs_properties_t* props, const char* name, const char* desc);
+
+	inline bool is_tristate_enabled(int64_t tristate) {
+		return tristate == 1;
+	}
+
+	inline bool is_tristate_disabled(int64_t tristate) {
+		return tristate == 0;
+	}
+
+	inline bool is_tristate_default(int64_t tristate) {
+		return tristate == -1;
+	}
 } // namespace obsffmpeg
