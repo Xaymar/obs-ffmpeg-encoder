@@ -696,7 +696,7 @@ void obsffmpeg::encoder::initialize_hw(obs_data_t*)
 	_context->framerate.den = _context->time_base.num = voi->fps_den;
 	ffmpeg::tools::setup_obs_color(voi->colorspace, voi->range, _context);
 	_context->sw_pix_fmt = ffmpeg::tools::obs_videoformat_to_avpixelformat(voi->format);
-	
+
 #ifdef WIN32
 	_context->pix_fmt = AV_PIX_FMT_D3D11;
 #endif
@@ -1382,6 +1382,7 @@ void obsffmpeg::encoder::parse_ffmpeg_commandline(std::string text)
 			std::string ropt = opt_stream.str();
 			if (ropt.size() > 0) {
 				opts.push_back(ropt);
+				opt_stream.str(std::string());
 				opt_stream.clear();
 			}
 		} else {
@@ -1413,13 +1414,13 @@ void obsffmpeg::encoder::parse_ffmpeg_commandline(std::string text)
 		}
 
 		try {
-			std::string key   = opt.substr(1, eq_at - cstr);
+			std::string key   = opt.substr(1, eq_at - cstr - 1);
 			std::string value = opt.substr(eq_at - cstr + 1);
 
 			int res = av_opt_set(_context, key.c_str(), value.c_str(), AV_OPT_SEARCH_CHILDREN);
 			if (res < 0) {
-				PLOG_WARNING("Option '%s' encountered error: %s", opt.c_str(),
-				             ffmpeg::tools::get_error_description(res));
+				PLOG_WARNING("Option '%s' (key: '%s', value: '%s') encountered error: %s", opt.c_str(),
+				             key.c_str(), value.c_str(), ffmpeg::tools::get_error_description(res));
 			}
 		} catch (const std::exception& ex) {
 			PLOG_ERROR("Option '%s' encountered exception: %s", opt.c_str(), ex.what())
