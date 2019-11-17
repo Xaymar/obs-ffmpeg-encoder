@@ -198,6 +198,9 @@ void obsffmpeg::nvenc::get_defaults(obs_data_t* settings, const AVCodec*, AVCode
 	obs_data_set_default_int(settings, ST_OTHER_ZEROLATENCY, -1);
 	obs_data_set_default_int(settings, ST_OTHER_WEIGHTED_PREDICTION, -1);
 	obs_data_set_default_int(settings, ST_OTHER_NONREFERENCE_PFRAMES, -1);
+
+	// Replay Buffer
+	obs_data_set_default_int(settings, "bitrate", 0);
 }
 
 static bool modified_ratecontrol(obs_properties_t* props, obs_property_t*, obs_data_t* settings)
@@ -595,9 +598,13 @@ void obsffmpeg::nvenc::update(obs_data_t* settings, const AVCodec* codec, AVCode
 			}
 		}
 
-		if (have_bitrate)
+		if (have_bitrate) {
 			context->bit_rate =
 			    static_cast<int>(obs_data_get_int(settings, ST_RATECONTROL_BITRATE_TARGET) * 1000);
+			// Support for Replay Buffer
+			obs_data_set_int(settings, "bitrate",
+			                 obs_data_get_int(settings, ST_RATECONTROL_BITRATE_TARGET));
+		}
 		if (have_bitrate_max)
 			context->rc_max_rate =
 			    static_cast<int>(obs_data_get_int(settings, ST_RATECONTROL_BITRATE_MAXIMUM) * 1000);
