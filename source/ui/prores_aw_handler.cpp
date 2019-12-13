@@ -21,6 +21,7 @@
 
 #include "prores_aw_handler.hpp"
 #include "codecs/prores.hpp"
+#include "ffmpeg/tools.hpp"
 #include "plugin.hpp"
 #include "utility.hpp"
 
@@ -65,6 +66,26 @@ void obsffmpeg::ui::prores_aw_handler::get_defaults(obs_data_t* settings, const 
 	obs_data_set_default_int(settings, P_PRORES_PROFILE, 0);
 }
 
+inline const char* profile_to_name(const AVProfile* ptr)
+{
+	switch (ptr->profile) {
+	case 0:
+		return TRANSLATE(P_PRORES_PROFILE_APCO);
+	case 1:
+		return TRANSLATE(P_PRORES_PROFILE_APCS);
+	case 2:
+		return TRANSLATE(P_PRORES_PROFILE_APCN);
+	case 3:
+		return TRANSLATE(P_PRORES_PROFILE_APCH);
+	case 4:
+		return TRANSLATE(P_PRORES_PROFILE_AP4H);
+	case 5:
+		return TRANSLATE(P_PRORES_PROFILE_AP4X);
+	default:
+		return ptr->name;
+	}
+}
+
 void obsffmpeg::ui::prores_aw_handler::get_properties(obs_properties_t* props, const AVCodec* codec,
                                                       AVCodecContext* context, bool)
 {
@@ -73,27 +94,7 @@ void obsffmpeg::ui::prores_aw_handler::get_properties(obs_properties_t* props, c
 		                                 OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 		obs_property_set_long_description(p, TRANSLATE(DESC(P_PRORES_PROFILE)));
 		for (auto ptr = codec->profiles; ptr->profile != FF_PROFILE_UNKNOWN; ptr++) {
-			if (strcmp("apco", ptr->name) == 0) {
-				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_APCO),
-				                          static_cast<int64_t>(ptr->profile));
-			} else if (strcmp("apcs", ptr->name) == 0) {
-				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_APCS),
-				                          static_cast<int64_t>(ptr->profile));
-			} else if (strcmp("apcn", ptr->name) == 0) {
-				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_APCN),
-				                          static_cast<int64_t>(ptr->profile));
-			} else if (strcmp("apch", ptr->name) == 0) {
-				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_APCH),
-				                          static_cast<int64_t>(ptr->profile));
-			} else if (strcmp("ap4h", ptr->name) == 0) {
-				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_AP4H),
-				                          static_cast<int64_t>(ptr->profile));
-			} else if (strcmp("ap4x", ptr->name) == 0) {
-				obs_property_list_add_int(p, TRANSLATE(P_PRORES_PROFILE_AP4X),
-				                          static_cast<int64_t>(ptr->profile));
-			} else {
-				obs_property_list_add_int(p, ptr->name, ptr->profile);
-			}
+			obs_property_list_add_int(p, profile_to_name(ptr), static_cast<int64_t>(ptr->profile));
 		}
 	} else {
 		obs_property_set_enabled(obs_properties_get(props, P_PRORES_PROFILE), false);
@@ -105,12 +106,18 @@ void obsffmpeg::ui::prores_aw_handler::update(obs_data_t* settings, const AVCode
 	context->profile = static_cast<int>(obs_data_get_int(settings, P_PRORES_PROFILE));
 }
 
-void obsffmpeg::ui::prores_aw_handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext*)
+void obsffmpeg::ui::prores_aw_handler::log_options(obs_data_t* settings, const AVCodec* codec, AVCodecContext* context)
 {
-	for (auto ptr = codec->profiles; ptr->profile != FF_PROFILE_UNKNOWN; ptr++) {
-		if (ptr->profile == static_cast<int>(obs_data_get_int(settings, P_PRORES_PROFILE)))
-			PLOG_INFO("[%s]   Profile: %s", codec->name, ptr->name);
-	}
+	PLOG_INFO("[%s]   Apple ProRes:", codec->name);
+	ffmpeg::tools::print_av_option_string(context, "profile", "    Profile", [&codec](int64_t v) {
+		int val = static_cast<int>(v);
+		for (auto ptr = codec->profiles; (ptr->profile != FF_PROFILE_UNKNOWN) && (ptr != nullptr); ptr++) {
+			if (ptr->profile == val) {
+				return std::string(profile_to_name(ptr));
+			}
+		}
+		return std::string("<Unknown>");
+	});
 }
 
 void obsffmpeg::ui::prores_aw_handler::process_avpacket(AVPacket& packet, const AVCodec*, AVCodecContext*)
