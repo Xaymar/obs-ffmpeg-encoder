@@ -106,8 +106,8 @@ try {
 			if (!av_codec_is_encoder(cdc))
 				continue;
 
-			if ((cdc->type == AVMediaType::AVMEDIA_TYPE_AUDIO)
-			    || (cdc->type == AVMediaType::AVMEDIA_TYPE_VIDEO)) {
+			if (/*(cdc->type == AVMediaType::AVMEDIA_TYPE_AUDIO)
+			    || */(cdc->type == AVMediaType::AVMEDIA_TYPE_VIDEO)) {
 				auto ptr = std::make_shared<obsffmpeg::encoder_factory>(cdc);
 				ptr->register_encoder();
 				generic_factories.emplace(cdc, ptr);
